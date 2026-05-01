@@ -1,7 +1,8 @@
-﻿using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using BackendAPI.Data;
 using BackendAPI.Models;
+using BackendAPI.Services.Discovery;
 
 namespace BackendAPI.Controllers
 {
@@ -18,10 +19,6 @@ namespace BackendAPI.Controllers
             _context = context;
         }
 
-        /// <summary>
-        /// Gets all Influencers
-        /// </summary>
-        /// <returns>List of all Influencers</returns>
         [HttpGet]
         public async Task<IActionResult> GetInfluencers()
         {
@@ -32,10 +29,6 @@ namespace BackendAPI.Controllers
             return Ok(influencers);
         }
 
-        /// <summary>
-        /// Get an Influencer by ID
-        /// </summary>
-        /// <param name="id">The Influencers unique identifier</param>
         [HttpGet("{id}")]
         public async Task<IActionResult> GetInfluencerById(Guid id)
         {
@@ -45,17 +38,11 @@ namespace BackendAPI.Controllers
                 .FirstOrDefaultAsync(i => i.Id == id);
 
             if (influencer == null)
-            {
-                _logger.LogInformation("Influencer with ID {Id} not found.", id);
                 return NotFound();
-            }
+
             return Ok(influencer);
         }
 
-        /// <summary>
-        /// Get an Influencer by display name
-        /// </summary>
-        /// <param name="displayName">The Influencers display name</param>
         [HttpGet("username/{displayName}")]
         public async Task<IActionResult> GetInfluencerByUsername(string displayName)
         {
@@ -65,16 +52,11 @@ namespace BackendAPI.Controllers
                 .FirstOrDefaultAsync(i => i.DisplayName == displayName);
 
             if (influencer == null)
-            {
-                _logger.LogInformation("Influencer with DisplayName {DisplayName} not found.", displayName);
                 return NotFound();
-            }
+
             return Ok(influencer);
         }
 
-        /// <summary>
-        /// Search influencers with filters
-        /// </summary>
         [HttpGet("search")]
         public async Task<IActionResult> SearchInfluencers(
             [FromQuery] int? nicheId,
@@ -90,79 +72,48 @@ namespace BackendAPI.Controllers
                 .Include(i => i.Market)
                 .AsQueryable();
 
-            if (nicheId.HasValue)
-                query = query.Where(i => i.NicheId == nicheId.Value);
+            if (nicheId.HasValue) query = query.Where(i => i.NicheId == nicheId.Value);
+            if (marketId.HasValue) query = query.Where(i => i.MarketId == marketId.Value);
+            if (minFollowers.HasValue) query = query.Where(i => i.FollowerCount >= minFollowers.Value);
+            if (maxFollowers.HasValue) query = query.Where(i => i.FollowerCount <= maxFollowers.Value);
+            if (minEngagement.HasValue) query = query.Where(i => i.EngagementRate >= minEngagement.Value);
+            if (maxBotScore.HasValue) query = query.Where(i => i.BotScore <= maxBotScore.Value);
+            if (!string.IsNullOrEmpty(platform)) query = query.Where(i => i.Platform == platform);
 
-            if (marketId.HasValue)
-                query = query.Where(i => i.MarketId == marketId.Value);
-
-            if (minFollowers.HasValue)
-                query = query.Where(i => i.FollowerCount >= minFollowers.Value);
-
-            if (maxFollowers.HasValue)
-                query = query.Where(i => i.FollowerCount <= maxFollowers.Value);
-
-            if (minEngagement.HasValue)
-                query = query.Where(i => i.EngagementRate >= minEngagement.Value);
-
-            if (maxBotScore.HasValue)
-                query = query.Where(i => i.BotScore <= maxBotScore.Value);
-
-            if (!string.IsNullOrEmpty(platform))
-                query = query.Where(i => i.Platform == platform);
-
-            var results = await query.ToListAsync();
-            return Ok(results);
+            return Ok(await query.ToListAsync());
         }
 
-        /// <summary>
-        /// Deletes an influencer by ID
-        /// </summary>
-        /// <param name="id">The influencers unique identifier</param>
         [HttpDelete("{id}")]
         public async Task<IActionResult> DeleteInfluencerById(Guid id)
         {
             var influencer = await _context.Influencers.FindAsync(id);
             if (influencer == null)
-            {
-                _logger.LogInformation("Influencer with ID {Id} not found for deletion.", id);
                 return NotFound();
-            }
+
             _context.Influencers.Remove(influencer);
             await _context.SaveChangesAsync();
             return NoContent();
         }
 
-        /// <summary>
-        /// Creates a new influencer
-        /// </summary>
-        /// <param name="influencer">The influencer object to create</param>
         [HttpPost]
         public async Task<IActionResult> CreateInfluencer([FromBody] Influencer influencer)
         {
             if (influencer == null)
-            {
-                _logger.LogWarning("Attempted to create an influencer with null data.");
                 return BadRequest();
-            }
 
-            var userNameExists = await _context.Influencers
+            var exists = await _context.Influencers
                 .AnyAsync(i => i.DisplayName == influencer.DisplayName);
 
-            if (userNameExists)
-            {
-                _logger.LogWarning("Duplicate DisplayName attempted: {DisplayName}.", influencer.DisplayName);
+            if (exists)
                 return Conflict(new { message = "An influencer with the same DisplayName already exists." });
-            }
 
-            var influencerEntity = new Influencer
+            var entity = new Influencer
             {
                 Name = influencer.Name,
                 DisplayName = influencer.DisplayName,
                 Platform = influencer.Platform,
                 NicheId = influencer.NicheId,
                 MarketId = influencer.MarketId,
-                // Fixed — these three were missing from the original mapping
                 FollowerCount = influencer.FollowerCount,
                 EngagementRate = influencer.EngagementRate,
                 BotScore = influencer.BotScore,
@@ -171,47 +122,43 @@ namespace BackendAPI.Controllers
                 TwitterHandle = influencer.TwitterHandle,
                 TikTokHandle = influencer.TikTokHandle,
                 YouTubeHandle = influencer.YouTubeHandle,
-                LastDataRefresh = DateTime.UtcNow
+                LastDataRefresh = DateTime.UtcNow,
+
+                // Manually added influencers are seeds — High priority, verified, refresh immediately
+                RefreshPriority = InfluencerThresholds.PriorityHigh,
+                IsVerified = true,
+                DiscoverySource = "Manual",
+                NextRefreshDue = DateTime.UtcNow
             };
 
-            _context.Influencers.Add(influencerEntity);
+            _context.Influencers.Add(entity);
             await _context.SaveChangesAsync();
 
-            return CreatedAtAction(nameof(GetInfluencerById),
-                new { id = influencerEntity.Id }, influencerEntity);
+            return CreatedAtAction(nameof(GetInfluencerById), new { id = entity.Id }, entity);
         }
 
-        /// <summary>
-        /// Updates an existing influencer
-        /// </summary>
-        /// <param name="id">The influencers unique identifier</param>
-        /// <param name="influencerEntity">The updated influencer object</param>
         [HttpPut("{id}")]
-        public async Task<IActionResult> UpdateInfluencerInformation(Guid id, [FromBody] Influencer influencerEntity)
+        public async Task<IActionResult> UpdateInfluencerInformation(Guid id, [FromBody] Influencer influencer)
         {
-            var existingInfluencer = await _context.Influencers.FindAsync(id);
-            if (existingInfluencer == null)
-            {
-                _logger.LogInformation("Influencer with ID {Id} not found for update.", id);
+            var existing = await _context.Influencers.FindAsync(id);
+            if (existing == null)
                 return NotFound();
-            }
 
-            existingInfluencer.Name = influencerEntity.Name;
-            existingInfluencer.DisplayName = influencerEntity.DisplayName;
-            existingInfluencer.Platform = influencerEntity.Platform;
-            existingInfluencer.NicheId = influencerEntity.NicheId;
-            existingInfluencer.MarketId = influencerEntity.MarketId;
-            // Fixed — these three were missing from the original mapping
-            existingInfluencer.FollowerCount = influencerEntity.FollowerCount;
-            existingInfluencer.EngagementRate = influencerEntity.EngagementRate;
-            existingInfluencer.BotScore = influencerEntity.BotScore;
-            existingInfluencer.Email = influencerEntity.Email;
-            existingInfluencer.InstagramHandle = influencerEntity.InstagramHandle;
-            existingInfluencer.TwitterHandle = influencerEntity.TwitterHandle;
-            existingInfluencer.TikTokHandle = influencerEntity.TikTokHandle;
-            existingInfluencer.YouTubeHandle = influencerEntity.YouTubeHandle;
+            existing.Name = influencer.Name;
+            existing.DisplayName = influencer.DisplayName;
+            existing.Platform = influencer.Platform;
+            existing.NicheId = influencer.NicheId;
+            existing.MarketId = influencer.MarketId;
+            existing.FollowerCount = influencer.FollowerCount;
+            existing.EngagementRate = influencer.EngagementRate;
+            existing.BotScore = influencer.BotScore;
+            existing.Email = influencer.Email;
+            existing.InstagramHandle = influencer.InstagramHandle;
+            existing.TwitterHandle = influencer.TwitterHandle;
+            existing.TikTokHandle = influencer.TikTokHandle;
+            existing.YouTubeHandle = influencer.YouTubeHandle;
 
-            _context.Influencers.Update(existingInfluencer);
+            _context.Influencers.Update(existing);
             await _context.SaveChangesAsync();
             return NoContent();
         }
