@@ -4,31 +4,20 @@ using BackendAPI.Services;
 using BackendAPI.Services.Discovery;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.EntityFrameworkCore;
-using System.Reflection;
 
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddControllers();
 builder.Services.AddSwaggerGen();
 
-// CORS — allow frontend
-var allowedOrigins = builder.Configuration["AllowedOrigins"]?.Split(',')
-    .Select(o => o.Trim())
-    .Where(o => !string.IsNullOrEmpty(o))
-    .ToArray() ?? Array.Empty<string>();
-
+// CORS — open during pilot, lock down after launch
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowFrontend", policy =>
     {
-        if (allowedOrigins.Length > 0)
-            policy.WithOrigins(allowedOrigins)
-                  .AllowAnyHeader()
-                  .AllowAnyMethod();
-        else
-            policy.AllowAnyOrigin()
-                  .AllowAnyHeader()
-                  .AllowAnyMethod();
+        policy.AllowAnyOrigin()
+              .AllowAnyHeader()
+              .AllowAnyMethod();
     });
 });
 
