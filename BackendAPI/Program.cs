@@ -10,7 +10,6 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddControllers();
 builder.Services.AddSwaggerGen();
 
-// CORS — open during pilot, lock down after launch
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowFrontend", policy =>
@@ -44,7 +43,13 @@ var app = builder.Build();
 
 app.UseSwagger();
 app.UseSwaggerUI();
+
+// CORS must be first — before auth, before routing
 app.UseCors("AllowFrontend");
+
+// NO app.UseHttpsRedirection() — Railway handles HTTPS at load balancer
+// Removing this fixes preflight OPTIONS requests being redirected
+
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
