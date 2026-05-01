@@ -1,0 +1,45 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * { box-sizing: border-box; }
+  body { font-family: 'DM Sans', sans-serif; background: #0a0a0a; color: #f0f0f0; margin: 0; -webkit-font-smoothing: antialiased; }
+  h1,h2,h3,h4 { font-family: 'Syne', sans-serif; }
+}
+
+@layer utilities {
+  .glass { background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); }
+  .card { background: #111111; border: 1px solid #1a1a1a; border-radius: 12px; }
+  .card-hover { transition: border-color 0.2s, transform 0.2s; cursor: pointer; }
+  .card-hover:hover { border-color: #2d2d2d; transform: translateY(-1px); }
+  .btn-primary { background: #2dd4bf; color: #0a0a0a; font-weight: 600; padding: 10px 20px; border-radius: 8px; border: none; cursor: pointer; font-size: 14px; transition: opacity 0.15s; display: inline-flex; align-items: center; gap: 6px; }
+  .btn-primary:hover { opacity: 0.9; }
+  .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+  .btn-secondary { background: transparent; color: #d9d9d9; font-weight: 500; padding: 10px 20px; border-radius: 8px; border: 1px solid #2d2d2d; cursor: pointer; font-size: 14px; transition: border-color 0.15s; display: inline-flex; align-items: center; gap: 6px; }
+  .btn-secondary:hover { border-color: #404040; background: #111111; }
+  .input { background: #111111; border: 1px solid #2d2d2d; border-radius: 8px; padding: 10px 14px; color: #f0f0f0; font-size: 14px; width: 100%; outline: none; transition: border-color 0.15s; font-family: 'DM Sans', sans-serif; }
+  .input:focus { border-color: #2dd4bf; }
+  .input::placeholder { color: #404040; }
+  select.input { cursor: pointer; }
+  textarea.input { resize: vertical; }
+  .label { font-size: 11px; font-weight: 500; color: #666; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 5px; display: block; }
+  .badge-teal { background: rgba(45,212,191,0.12); color: #2dd4bf; border: 1px solid rgba(45,212,191,0.2); padding: 2px 9px; border-radius: 20px; font-size: 11px; font-weight: 500; }
+  .badge-blue { background: rgba(96,165,250,0.12); color: #60a5fa; border: 1px solid rgba(96,165,250,0.2); padding: 2px 9px; border-radius: 20px; font-size: 11px; font-weight: 500; }
+  .badge-purple { background: rgba(192,132,252,0.12); color: #c084fc; border: 1px solid rgba(192,132,252,0.2); padding: 2px 9px; border-radius: 20px; font-size: 11px; font-weight: 500; }
+  .badge-amber { background: rgba(251,191,36,0.12); color: #fbbf24; border: 1px solid rgba(251,191,36,0.2); padding: 2px 9px; border-radius: 20px; font-size: 11px; font-weight: 500; }
+  .badge-green { background: rgba(74,222,128,0.12); color: #4ade80; border: 1px solid rgba(74,222,128,0.2); padding: 2px 9px; border-radius: 20px; font-size: 11px; font-weight: 500; }
+  .badge-red { background: rgba(248,113,113,0.12); color: #f87171; border: 1px solid rgba(248,113,113,0.2); padding: 2px 9px; border-radius: 20px; font-size: 11px; font-weight: 500; }
+  .sidebar-link { display: flex; align-items: center; gap: 10px; padding: 9px 12px; border-radius: 8px; font-size: 13px; font-weight: 500; color: #555; cursor: pointer; transition: all 0.15s; text-decoration: none; }
+  .sidebar-link:hover { background: #111; color: #ccc; }
+  .stat-card { background: #111111; border: 1px solid #1a1a1a; border-radius: 12px; padding: 20px; }
+  .table-row { border-bottom: 1px solid #1a1a1a; }
+  .table-row:last-child { border-bottom: none; }
+  .table-row:hover { background: rgba(255,255,255,0.015); }
+  .score-bar { height: 4px; background: #1a1a1a; border-radius: 2px; overflow: hidden; }
+  .score-fill { height: 100%; border-radius: 2px; transition: width 0.6s ease; }
+  .page-fade { animation: fadeIn 0.25s ease; }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+  .spinner { width: 18px; height: 18px; border: 2px solid rgba(45,212,191,0.2); border-top-color: #2dd4bf; border-radius: 50%; animation: spin 0.7s linear infinite; display: inline-block; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+}

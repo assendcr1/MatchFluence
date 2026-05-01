@@ -1,0 +1,28 @@
+# Build results
+bin/
+obj/
+Debug/
+Release/
+*.exe
+*.dll
+*.pdb
+*.log
+
+# Visual Studio files
+.vs/
+*.user
+*.suo
+
+# NuGet
+*.nupkg
+packages/
+
+# Other
+*.dbmdl
+*.bak
+*.mdf
+*.ldf
+*.tmp
+
+# Test results
+TestResults/
