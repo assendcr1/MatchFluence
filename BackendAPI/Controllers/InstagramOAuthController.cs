@@ -30,8 +30,6 @@ namespace BackendAPI.Controllers
             _logger = logger;
         }
 
-        // Step 1 — Generate the Instagram OAuth authorization URL
-        // Frontend redirects user to this URL
         [HttpGet("auth-url")]
         public IActionResult GetAuthUrl([FromQuery] Guid influencerId)
         {
@@ -41,8 +39,9 @@ namespace BackendAPI.Controllers
             if (string.IsNullOrEmpty(appId) || string.IsNullOrEmpty(redirectUri))
                 return BadRequest(new { message = "Instagram OAuth not configured." });
 
-            var scope = "instagram_basic,instagram_manage_insights,pages_read_engagement";
-            var state = influencerId.ToString(); // pass influencer ID through OAuth state
+            // Instagram Basic Display API scopes only
+            var scope = "instagram_basic,instagram_content_publish";
+            var state = influencerId.ToString();
 
             var authUrl = $"https://api.instagram.com/oauth/authorize" +
                           $"?client_id={appId}" +
@@ -54,8 +53,6 @@ namespace BackendAPI.Controllers
             return Ok(new { authUrl });
         }
 
-        // Step 2 — Handle the OAuth callback
-        // Instagram redirects back here with a code, exchange it for a token
         [HttpPost("callback")]
         public async Task<IActionResult> HandleCallback(
             [FromBody] OAuthCallbackRequest request,
@@ -70,23 +67,20 @@ namespace BackendAPI.Controllers
 
             try
             {
-                // Exchange code for short-lived token
                 var tokenResponse = await ExchangeCodeForTokenAsync(
                     request.Code, appId, appSecret, redirectUri);
 
                 if (tokenResponse == null)
                     return BadRequest(new { message = "Failed to exchange code for token." });
 
-                // Exchange short-lived token for long-lived token (60 days)
                 var longLivedToken = await ExchangeForLongLivedTokenAsync(
                     tokenResponse.AccessToken, appSecret);
 
                 var finalToken = longLivedToken ?? tokenResponse.AccessToken;
                 var tokenExpiry = longLivedToken != null
-                    ? DateTime.UtcNow.AddDays(59)  // long-lived tokens last 60 days
-                    : DateTime.UtcNow.AddHours(1);  // short-lived fallback
+                    ? DateTime.UtcNow.AddDays(59)
+                    : DateTime.UtcNow.AddHours(1);
 
-                // Find the influencer by ID from state
                 if (!Guid.TryParse(request.State, out var influencerId))
                     return BadRequest(new { message = "Invalid state parameter." });
 
@@ -96,30 +90,19 @@ namespace BackendAPI.Controllers
                 if (influencer == null)
                     return NotFound(new { message = "Influencer not found." });
 
-                // Get their Instagram user ID using the token
-                var igUserId = await GetInstagramUserIdAsync(finalToken);
+                var igUsername = await GetInstagramUsernameAsync(finalToken);
 
-                // Save token to influencer profile
                 influencer.AccessToken = finalToken;
                 influencer.TokenExpiry = tokenExpiry;
-                if (!string.IsNullOrEmpty(igUserId))
-                    influencer.InstagramHandle = "@" + igUserId;
+                if (!string.IsNullOrEmpty(igUsername))
+                    influencer.InstagramHandle = "@" + igUsername;
 
                 await _context.SaveChangesAsync(cancellationToken);
-
-                // Trigger immediate refresh with real data
                 await _refreshService.RefreshInfluencerAsync(influencerId, cancellationToken);
 
-                _logger.LogInformation(
-                    "Instagram connected for influencer {Id} — token expires {Expiry}",
-                    influencerId, tokenExpiry);
+                _logger.LogInformation("Instagram connected for {Id}", influencerId);
 
-                return Ok(new
-                {
-                    message = "Instagram connected successfully.",
-                    influencerId,
-                    tokenExpiry
-                });
+                return Ok(new { message = "Instagram connected successfully.", influencerId, tokenExpiry });
             }
             catch (Exception ex)
             {
@@ -128,13 +111,11 @@ namespace BackendAPI.Controllers
             }
         }
 
-        // Check if an influencer has a connected Instagram account
         [HttpGet("status/{influencerId}")]
         public async Task<IActionResult> GetConnectionStatus(Guid influencerId)
         {
             var influencer = await _context.Influencers.FindAsync(influencerId);
-            if (influencer == null)
-                return NotFound();
+            if (influencer == null) return NotFound();
 
             var isConnected = !string.IsNullOrEmpty(influencer.AccessToken)
                               && influencer.TokenExpiry > DateTime.UtcNow;
@@ -146,8 +127,6 @@ namespace BackendAPI.Controllers
                 instagramHandle = influencer.InstagramHandle
             });
         }
-
-        // ── Helpers ──────────────────────────────────────────────────────────
 
         private async Task<TokenResponse?> ExchangeCodeForTokenAsync(
             string code, string appId, string appSecret, string redirectUri)
@@ -164,7 +143,12 @@ namespace BackendAPI.Controllers
             var response = await _httpClient.PostAsync(
                 "https://api.instagram.com/oauth/access_token", content);
 
-            if (!response.IsSuccessStatusCode) return null;
+            if (!response.IsSuccessStatusCode)
+            {
+                var err = await response.Content.ReadAsStringAsync();
+                _logger.LogError("Token exchange failed: {Error}", err);
+                return null;
+            }
 
             var json = await response.Content.ReadAsStringAsync();
             return JsonSerializer.Deserialize<TokenResponse>(json,
@@ -187,25 +171,23 @@ namespace BackendAPI.Controllers
                 var json = await response.Content.ReadAsStringAsync();
                 using var doc = JsonDocument.Parse(json);
                 return doc.RootElement.TryGetProperty("access_token", out var token)
-                    ? token.GetString()
-                    : null;
+                    ? token.GetString() : null;
             }
             catch { return null; }
         }
 
-        private async Task<string?> GetInstagramUserIdAsync(string accessToken)
+        private async Task<string?> GetInstagramUsernameAsync(string accessToken)
         {
             try
             {
-                var url = $"https://graph.instagram.com/me?fields=username&access_token={accessToken}";
+                var url = $"https://graph.instagram.com/me?fields=id,username&access_token={accessToken}";
                 var response = await _httpClient.GetAsync(url);
                 if (!response.IsSuccessStatusCode) return null;
 
                 var json = await response.Content.ReadAsStringAsync();
                 using var doc = JsonDocument.Parse(json);
-                return doc.RootElement.TryGetProperty("username", out var username)
-                    ? username.GetString()
-                    : null;
+                return doc.RootElement.TryGetProperty("username", out var u)
+                    ? u.GetString() : null;
             }
             catch { return null; }
         }
