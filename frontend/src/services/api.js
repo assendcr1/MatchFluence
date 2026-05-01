@@ -1,17 +1,19 @@
 import axios from 'axios'
 
-// Always use /api — Vercel proxies this to Railway
-// This means no cross-origin requests, no CORS issues ever
 const BASE = '/api'
-
 const auth = (key) => ({ headers: { 'X-Api-Key': key } })
 
 export const api = {
+  // Registration
   registerBrand: (d) => axios.post(`${BASE}/brand/register`, d),
   registerAgency: (d) => axios.post(`${BASE}/agency/register`, d),
   registerInfluencer: (d) => axios.post(`${BASE}/influencer`, d),
+
+  // Profiles
   getBrandProfile: (key) => axios.get(`${BASE}/brand/profile`, auth(key)),
   getAgencyProfile: (key) => axios.get(`${BASE}/agency/profile`, auth(key)),
+
+  // Influencers
   getInfluencers: () => axios.get(`${BASE}/influencer`),
   getInfluencerById: (id) => axios.get(`${BASE}/influencer/${id}`),
   getInfluencerByUsername: (n) => axios.get(`${BASE}/influencer/username/${n}`),
@@ -21,19 +23,36 @@ export const api = {
   getInfluencerMetrics: (id) => axios.get(`${BASE}/influencer/${id}/metrics`),
   getInfluencerCampaigns: (id) => axios.get(`${BASE}/influencer/${id}/campaigns`),
   getInfluencerSummary: (id) => axios.get(`${BASE}/influencer/${id}/summary`),
+
+  // Instagram OAuth
+  getInstagramAuthUrl: (influencerId) =>
+    axios.get(`${BASE}/instagram/auth-url?influencerId=${influencerId}`),
+  instagramCallback: (d) => axios.post(`${BASE}/instagram/callback`, d),
+  getInstagramStatus: (influencerId) =>
+    axios.get(`${BASE}/instagram/status/${influencerId}`),
+
+  // Niches & Markets
   getNiches: () => axios.get(`${BASE}/niches`),
   getMarkets: () => axios.get(`${BASE}/markets`),
   createNiche: (d) => axios.post(`${BASE}/niches`, d),
   createMarket: (d) => axios.post(`${BASE}/markets`, d),
   deleteNiche: (id) => axios.delete(`${BASE}/niches/${id}`),
   deleteMarket: (id) => axios.delete(`${BASE}/markets/${id}`),
+
+  // Campaigns
   getCampaigns: () => axios.get(`${BASE}/campaign`),
   createCampaign: (d) => axios.post(`${BASE}/campaign`, d),
   deleteCampaign: (id) => axios.delete(`${BASE}/campaign/${id}`),
   getBrandCampaigns: (key) => axios.get(`${BASE}/brand/campaigns`, auth(key)),
   getAgencyCampaigns: (key) => axios.get(`${BASE}/agency/campaigns`, auth(key)),
+
+  // Match
   runMatch: (key, d) => axios.post(`${BASE}/match`, d, auth(key)),
+
+  // Messaging
   sendMessage: (d) => axios.post(`${BASE}/messaging/send-message`, d),
+
+  // Refresh
   refreshAll: () => axios.post(`${BASE}/refresh/all`),
   refreshOne: (id) => axios.post(`${BASE}/refresh/${id}`),
 }
