@@ -97,40 +97,31 @@ namespace BackendAPI.Services
                 if (!response.IsSuccessStatusCode) return new();
 
                 var json = await response.Content.ReadAsStringAsync();
-                _logger.LogDebug("Media response for @{Username}: {Json}", clean, json[..Math.Min(500, json.Length)]);
-
                 using var doc = JsonDocument.Parse(json);
                 var media = new List<InstagramMedia>();
 
-                // Try data.edges first
-                JsonElement edges = default;
-                if (doc.RootElement.TryGetProperty("data", out var data))
-                {
-                    if (data.TryGetProperty("edges", out var e1)) edges = e1;
-                    else if (data.TryGetProperty("edge_owner_to_timeline_media", out var eotm)
-                             && eotm.TryGetProperty("edges", out var e2)) edges = e2;
-                }
-                else if (doc.RootElement.TryGetProperty("edges", out var e3)) edges = e3;
+                // Structure: { data: { items: [ { like_count, comment_count, id, media_type } ] } }
+                if (!doc.RootElement.TryGetProperty("data", out var data)) return media;
+                if (!data.TryGetProperty("items", out var items)) return media;
+                if (items.ValueKind != JsonValueKind.Array) return media;
 
-                if (edges.ValueKind != JsonValueKind.Array) return media;
-
-                foreach (var edge in edges.EnumerateArray().Take(10))
+                foreach (var item in items.EnumerateArray().Take(10))
                 {
-                    var node = edge.TryGetProperty("node", out var n) ? n : edge;
-                    var likes = node.TryGetProperty("edge_liked_by", out var elb)
-                        && elb.TryGetProperty("count", out var lc) ? lc.GetInt32() : 0;
-                    var comments = node.TryGetProperty("edge_media_to_comment", out var emc)
-                        && emc.TryGetProperty("count", out var cc) ? cc.GetInt32() : 0;
+                    var likes = item.TryGetProperty("like_count", out var lc) ? lc.GetInt32() : 0;
+                    var comments = item.TryGetProperty("comment_count", out var cc) ? cc.GetInt32() : 0;
+                    var mediaType = item.TryGetProperty("media_type", out var mt) ? mt.GetInt32().ToString() : "";
+                    var id = item.TryGetProperty("id", out var mid) ? mid.GetString() ?? "" : "";
 
                     media.Add(new InstagramMedia
                     {
-                        Id = node.TryGetProperty("id", out var mid) ? mid.GetString() ?? "" : "",
+                        Id = id,
                         LikeCount = likes,
                         CommentsCount = comments,
-                        MediaType = node.TryGetProperty("__typename", out var mt) ? mt.GetString() ?? "" : ""
+                        MediaType = mediaType
                     });
                 }
 
+                _logger.LogInformation("Media for @{Username}: {Count} posts parsed", clean, media.Count);
                 return media;
             }
             catch (Exception ex)
