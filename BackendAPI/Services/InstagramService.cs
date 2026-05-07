@@ -151,34 +151,21 @@ namespace BackendAPI.Services
                 if (!response.IsSuccessStatusCode) return new();
 
                 var json = await response.Content.ReadAsStringAsync();
-                _logger.LogDebug("Similar users for @{Username}: {Json}", clean, json[..Math.Min(500, json.Length)]);
-
                 using var doc = JsonDocument.Parse(json);
                 var usernames = new List<string>();
 
-                // Try multiple response shapes
-                JsonElement arr = default;
-                if (doc.RootElement.TryGetProperty("data", out var data))
+                // Structure: { data: { edges: [ { node: { username, id, ... } } ] } }
+                if (doc.RootElement.TryGetProperty("data", out var data)
+                    && data.TryGetProperty("edges", out var edges)
+                    && edges.ValueKind == JsonValueKind.Array)
                 {
-                    if (data.ValueKind == JsonValueKind.Array) arr = data;
-                    else if (data.TryGetProperty("users", out var u)) arr = u;
-                    else if (data.TryGetProperty("edges", out var e)) arr = e;
-                }
-                else if (doc.RootElement.ValueKind == JsonValueKind.Array) arr = doc.RootElement;
-
-                if (arr.ValueKind == JsonValueKind.Array)
-                {
-                    foreach (var item in arr.EnumerateArray().Take(20))
+                    foreach (var edge in edges.EnumerateArray().Take(20))
                     {
-                        // Try direct username field or node.username
-                        string? uname = null;
-                        if (item.TryGetProperty("username", out var u1)) uname = u1.GetString();
-                        else if (item.TryGetProperty("node", out var node)
-                                 && node.TryGetProperty("username", out var u2)) uname = u2.GetString();
-                        else if (item.TryGetProperty("user", out var user)
-                                 && user.TryGetProperty("username", out var u3)) uname = u3.GetString();
-
-                        if (!string.IsNullOrEmpty(uname)) usernames.Add(uname);
+                        var node = edge.TryGetProperty("node", out var n) ? n : edge;
+                        if (node.TryGetProperty("username", out var u)
+                            && u.GetString() is string uname
+                            && !string.IsNullOrEmpty(uname))
+                            usernames.Add(uname);
                     }
                 }
 
