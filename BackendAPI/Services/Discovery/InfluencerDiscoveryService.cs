@@ -11,7 +11,16 @@ namespace BackendAPI.Services.Discovery
         private readonly BotScoreCalculator _botScoreCalculator;
         private readonly ILogger<InfluencerDiscoveryService> _logger;
 
-        private static readonly TimeSpan ThrottleDelay = TimeSpan.FromSeconds(1);
+        private static readonly TimeSpan ThrottleDelay = TimeSpan.FromSeconds(2);
+
+        // SA brand accounts — their posts tag real SA influencers
+        private static readonly List<string> SaBrandAccounts = new()
+        {
+            "woolworths_sa", "nandossa", "checkers_sa", "disneyplussouthafrica",
+            "puma_za", "adidasza", "nikesouthafrica", "showmax",
+            "discoverysa", "standardbankza", "fnbsouthafrica", "nedbank",
+            "mtnza", "vodacomsa", "telkomsa", "multichoiceza"
+        };
 
         public InfluencerDiscoveryService(
             IServiceScopeFactory scopeFactory,
@@ -26,17 +35,14 @@ namespace BackendAPI.Services.Discovery
         }
 
         public async Task<List<DiscoveredAccount>> MineHashtagsAsync(
-            string niche,
-            List<string> hashtags,
-            CancellationToken ct)
+            string niche, List<string> hashtags, CancellationToken ct)
         {
-            _logger.LogInformation("Hashtag mining skipped — using graph expansion for niche: {Niche}", niche);
+            _logger.LogInformation("Hashtag mining skipped — using brand account strategy");
             return new List<DiscoveredAccount>();
         }
 
         public async Task<List<DiscoveredAccount>> ExpandFromInfluencerAsync(
-            Guid influencerId,
-            CancellationToken ct)
+            Guid influencerId, CancellationToken ct)
         {
             using var scope = _scopeFactory.CreateScope();
             var ctx = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
@@ -48,31 +54,17 @@ namespace BackendAPI.Services.Discovery
             var handle = influencer.InstagramHandle.TrimStart('@');
             var discovered = new List<DiscoveredAccount>();
 
-            var similar = await _instagramService.GetSimilarUsersAsync(handle);
-            foreach (var username in similar)
+            // Extract tagged users from the influencer's own posts
+            var tagged = await _instagramService.GetTaggedUsersAsync(handle);
+            foreach (var username in tagged)
             {
                 discovered.Add(new DiscoveredAccount
                 {
                     Handle = username,
                     Name = username,
-                    DiscoverySource = "SimilarUsers",
+                    DiscoverySource = "TaggedInPost",
                     DiscoveredFromInfluencerId = influencerId
                 });
-                await Task.Delay(200, ct);
-            }
-
-            var tagged = await _instagramService.GetTaggedUsersAsync(handle);
-            foreach (var username in tagged)
-            {
-                if (!discovered.Any(d => d.Handle == username))
-                    discovered.Add(new DiscoveredAccount
-                    {
-                        Handle = username,
-                        Name = username,
-                        DiscoverySource = "TaggedInPost",
-                        DiscoveredFromInfluencerId = influencerId
-                    });
-                await Task.Delay(200, ct);
             }
 
             _logger.LogInformation("Expanded from @{Handle}: {Count} candidates", handle, discovered.Count);
@@ -80,8 +72,7 @@ namespace BackendAPI.Services.Discovery
         }
 
         public async Task<DiscoveredAccount?> QualifyAccountAsync(
-            string handle,
-            CancellationToken ct)
+            string handle, CancellationToken ct)
         {
             try
             {
@@ -122,10 +113,7 @@ namespace BackendAPI.Services.Discovery
         }
 
         public async Task<Guid?> IngestAccountAsync(
-            DiscoveredAccount account,
-            int nicheId,
-            int marketId,
-            CancellationToken ct)
+            DiscoveredAccount account, int nicheId, int marketId, CancellationToken ct)
         {
             try
             {
@@ -168,7 +156,7 @@ namespace BackendAPI.Services.Discovery
                 };
 
                 ctx.Influencers.Add(influencer);
-                await ctx.SaveChangesAsync(ct);
+                await ctx.SaveChangesAsync(CancellationToken.None);
 
                 _logger.LogInformation("✓ Ingested @{Handle} ({Followers} followers)",
                     clean, account.FollowerCount);
@@ -184,8 +172,39 @@ namespace BackendAPI.Services.Discovery
 
         public async Task RunDiscoveryCycleAsync(CancellationToken ct)
         {
-            _logger.LogInformation("Starting full discovery cycle");
+            _logger.LogInformation("Starting discovery cycle — SA brand account strategy");
 
+            int discovered = 0;
+
+            // Strategy 1: Extract tagged users from SA brand posts
+            foreach (var brandAccount in SaBrandAccounts)
+            {
+                if (ct.IsCancellationRequested) break;
+                try
+                {
+                    _logger.LogInformation("Mining brand account @{Brand}", brandAccount);
+                    var tagged = await _instagramService.GetTaggedUsersAsync(brandAccount);
+                    _logger.LogInformation("@{Brand}: {Count} tagged users found", brandAccount, tagged.Count);
+
+                    foreach (var candidate in tagged)
+                    {
+                        if (ct.IsCancellationRequested) break;
+                        var qualified = await QualifyAccountAsync(candidate, ct);
+                        if (qualified == null) continue;
+
+                        var id = await IngestAccountAsync(qualified, 1, 1, ct);
+                        if (id.HasValue) discovered++;
+                        await Task.Delay(ThrottleDelay, ct);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Error mining brand @{Brand}", brandAccount);
+                }
+                await Task.Delay(ThrottleDelay, ct);
+            }
+
+            // Strategy 2: Expand from existing seed influencers tagged posts
             List<Influencer> seeds;
             using (var scope = _scopeFactory.CreateScope())
             {
@@ -196,9 +215,6 @@ namespace BackendAPI.Services.Discovery
                     .ToListAsync(ct);
             }
 
-            _logger.LogInformation("Discovery: {Count} seed influencers", seeds.Count);
-
-            int discovered = 0;
             foreach (var seed in seeds)
             {
                 if (ct.IsCancellationRequested) break;
@@ -223,7 +239,7 @@ namespace BackendAPI.Services.Discovery
                 await Task.Delay(ThrottleDelay, ct);
             }
 
-            _logger.LogInformation("Discovery cycle complete. {Count} new influencers added", discovered);
+            _logger.LogInformation("Discovery complete. {Count} new influencers added", discovered);
         }
     }
 }
