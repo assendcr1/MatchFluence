@@ -146,7 +146,7 @@ namespace BackendAPI.Services
                     SnapshotDate = DateTime.UtcNow
                 });
 
-                await context.SaveChangesAsync(cancellationToken);
+                await context.SaveChangesAsync(CancellationToken.None);
 
                 _logger.LogInformation("Fallback refresh complete for {DisplayName} — BotScore: {BotScore}",
                     influencer.DisplayName, botScore);
@@ -221,7 +221,7 @@ namespace BackendAPI.Services
                 SnapshotDate = DateTime.UtcNow
             });
 
-            await context.SaveChangesAsync(cancellationToken);
+            await context.SaveChangesAsync(CancellationToken.None);
 
             _logger.LogInformation(
                 "Instagram refresh complete for {DisplayName} — Followers: {F}, Engagement: {E}%, BotScore: {B}",
