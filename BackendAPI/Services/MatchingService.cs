@@ -63,33 +63,20 @@ namespace BackendAPI.Services
                 return new List<MatchResult>();
 
             // ── Step 2: Score each candidate ────────────────────────────────
-            var scored = candidates
+            var top10 = candidates
                 .Select(influencer => ScoreInfluencer(influencer, request))
                 .OrderByDescending(r => r.MatchScore)
-                .Take(5)
+                .Take(10)
                 .ToList();
 
-            _logger.LogInformation("Top 5 selected. Scores: {Scores}",
-                string.Join(", ", scored.Select(s => $"{s.DisplayName}:{s.MatchScore}")));
+            _logger.LogInformation("Top 10 selected. Scores: {Scores}",
+                string.Join(", ", top10.Select(s => $"{s.DisplayName}:{s.MatchScore}")));
 
-            // ── Step 3: AI reasoning on top 5 ───────────────────────────────
-            // Runs in parallel to keep response time down
-            var reasoningTasks = scored.Select(async result =>
-            {
-                try
-                {
-                    result.MatchReason = await _aiReasoning.GenerateReasonAsync(request, result);
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogWarning(ex, "AI reasoning failed for {InfluencerId} — returning score only",
-                        result.InfluencerId);
-                    result.MatchReason = null;
-                }
-                return result;
-            });
+            // ── Step 3: Claude AI selects top 5 from top 10 ─────────────────
+            // Send top 10 to Claude, get back ranked top 5 with reasoning
+            var finalResults = await _aiReasoning.RankAndReasonAsync(request, top10);
 
-            var finalResults = (await Task.WhenAll(reasoningTasks)).ToList();
+            _logger.LogInformation("Claude selected top {Count} from top 10", finalResults.Count);
 
             // ── Step 4: Persist matches if CampaignId provided ──────────────
             if (request.CampaignId.HasValue)
