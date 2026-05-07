@@ -48,6 +48,7 @@ export const api = {
 
   // Match
   runMatch: (key, d) => axios.post(`${BASE}/match`, d, auth(key)),
+  saveCampaign: (key, d) => axios.post(`${BASE}/campaigns`, d, auth(key)),
 
   // Messaging
   sendMessage: (d) => axios.post(`${BASE}/messaging/send-message`, d),
