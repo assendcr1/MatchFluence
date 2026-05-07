@@ -25,19 +25,15 @@ namespace BackendAPI.Services.Discovery
             _logger = logger;
         }
 
-        // Stage 1 — Hashtag mining replaced by Similar Users via RapidAPI
         public async Task<List<DiscoveredAccount>> MineHashtagsAsync(
             string niche,
             List<string> hashtags,
             CancellationToken ct)
         {
-            // RapidAPI public scraper doesn't support hashtag search
-            // We use Similar Users graph expansion instead
             _logger.LogInformation("Hashtag mining skipped — using graph expansion for niche: {Niche}", niche);
             return new List<DiscoveredAccount>();
         }
 
-        // Stage 2 — Expand from a known influencer via Similar Users + tagged posts
         public async Task<List<DiscoveredAccount>> ExpandFromInfluencerAsync(
             Guid influencerId,
             CancellationToken ct)
@@ -52,20 +48,30 @@ namespace BackendAPI.Services.Discovery
             var handle = influencer.InstagramHandle.TrimStart('@');
             var discovered = new List<DiscoveredAccount>();
 
-            // Similar users
             var similar = await _instagramService.GetSimilarUsersAsync(handle);
             foreach (var username in similar)
             {
-                discovered.Add(new DiscoveredAccount { Handle = username, Source = "SimilarUsers" });
+                discovered.Add(new DiscoveredAccount
+                {
+                    Handle = username,
+                    Name = username,
+                    DiscoverySource = "SimilarUsers",
+                    DiscoveredFromInfluencerId = influencerId
+                });
                 await Task.Delay(200, ct);
             }
 
-            // Tagged users from posts
             var tagged = await _instagramService.GetTaggedUsersAsync(handle);
             foreach (var username in tagged)
             {
                 if (!discovered.Any(d => d.Handle == username))
-                    discovered.Add(new DiscoveredAccount { Handle = username, Source = "TaggedInPost" });
+                    discovered.Add(new DiscoveredAccount
+                    {
+                        Handle = username,
+                        Name = username,
+                        DiscoverySource = "TaggedInPost",
+                        DiscoveredFromInfluencerId = influencerId
+                    });
                 await Task.Delay(200, ct);
             }
 
@@ -73,7 +79,6 @@ namespace BackendAPI.Services.Discovery
             return discovered;
         }
 
-        // Stage 3 — Qualify an account against thresholds
         public async Task<DiscoveredAccount?> QualifyAccountAsync(
             string handle,
             CancellationToken ct)
@@ -85,10 +90,7 @@ namespace BackendAPI.Services.Discovery
                 if (profile == null) return null;
 
                 if (profile.FollowersCount < InfluencerThresholds.MinFollowers)
-                {
-                    _logger.LogDebug("@{Handle} below threshold ({Count} followers)", clean, profile.FollowersCount);
                     return null;
-                }
 
                 var media = await _instagramService.GetMediaAsync(clean);
                 await Task.Delay(500, ct);
@@ -101,14 +103,6 @@ namespace BackendAPI.Services.Discovery
                         (decimal)totalEng / Math.Min(media.Count, 10) / profile.FollowersCount * 100, 2);
                 }
 
-                var botScore = _botScoreCalculator.Calculate(
-                    followerCount: profile.FollowersCount,
-                    followingCount: profile.FollowsCount,
-                    engagementRate: engagementRate,
-                    postCount: profile.MediaCount,
-                    accountAgeDays: 365,
-                    previousFollowerCount: null);
-
                 return new DiscoveredAccount
                 {
                     Handle = clean,
@@ -116,10 +110,8 @@ namespace BackendAPI.Services.Discovery
                     FollowerCount = profile.FollowersCount,
                     FollowingCount = profile.FollowsCount,
                     EngagementRate = engagementRate,
-                    BotScore = botScore,
                     PostCount = profile.MediaCount,
-                    IsVerified = profile.IsVerified,
-                    Source = "GraphExpansion"
+                    DiscoverySource = "GraphExpansion"
                 };
             }
             catch (Exception ex)
@@ -129,7 +121,6 @@ namespace BackendAPI.Services.Discovery
             }
         }
 
-        // Stage 4 — Write qualified account to Influencers table
         public async Task<Guid?> IngestAccountAsync(
             DiscoveredAccount account,
             int nicheId,
@@ -148,20 +139,29 @@ namespace BackendAPI.Services.Discovery
                                    i.DisplayName == clean, ct);
                 if (exists) return null;
 
+                var botScore = _botScoreCalculator.Calculate(
+                    followerCount: account.FollowerCount,
+                    followingCount: account.FollowingCount,
+                    engagementRate: account.EngagementRate,
+                    postCount: account.PostCount,
+                    accountAgeDays: 365,
+                    previousFollowerCount: null);
+
                 var influencer = new Influencer
                 {
                     Name = account.Name ?? clean,
                     DisplayName = clean,
-                    Platform = "Instagram",
+                    Platform = account.Platform,
                     InstagramHandle = "@" + clean,
                     FollowerCount = account.FollowerCount,
                     EngagementRate = account.EngagementRate,
-                    BotScore = account.BotScore,
+                    BotScore = botScore,
                     NicheId = nicheId,
                     MarketId = marketId,
                     RefreshPriority = InfluencerThresholds.PriorityLow,
-                    IsVerified = account.IsVerified,
-                    DiscoverySource = account.Source ?? "GraphExpansion",
+                    IsVerified = false,
+                    DiscoverySource = account.DiscoverySource ?? "GraphExpansion",
+                    DiscoveredFromInfluencerId = account.DiscoveredFromInfluencerId,
                     LastDataRefresh = DateTime.UtcNow,
                     NextRefreshDue = DateTime.UtcNow.AddHours(InfluencerThresholds.LowPriorityRefreshHours),
                     Email = $"{clean}@placeholder.com"
@@ -182,7 +182,6 @@ namespace BackendAPI.Services.Discovery
             }
         }
 
-        // Full discovery cycle — runs all stages for all High Priority seeds
         public async Task RunDiscoveryCycleAsync(CancellationToken ct)
         {
             _logger.LogInformation("Starting full discovery cycle");
@@ -203,23 +202,17 @@ namespace BackendAPI.Services.Discovery
             foreach (var seed in seeds)
             {
                 if (ct.IsCancellationRequested) break;
-
                 try
                 {
                     var candidates = await ExpandFromInfluencerAsync(seed.Id, ct);
-
                     foreach (var candidate in candidates)
                     {
                         if (ct.IsCancellationRequested) break;
-
                         var qualified = await QualifyAccountAsync(candidate.Handle, ct);
                         if (qualified == null) continue;
-
-                        var id = await IngestAccountAsync(
-                            qualified, seed.NicheId, seed.MarketId, ct);
-
+                        qualified.DiscoveredFromInfluencerId = seed.Id;
+                        var id = await IngestAccountAsync(qualified, seed.NicheId, seed.MarketId, ct);
                         if (id.HasValue) discovered++;
-
                         await Task.Delay(ThrottleDelay, ct);
                     }
                 }
@@ -227,7 +220,6 @@ namespace BackendAPI.Services.Discovery
                 {
                     _logger.LogError(ex, "Discovery error for seed {Id}", seed.Id);
                 }
-
                 await Task.Delay(ThrottleDelay, ct);
             }
 
