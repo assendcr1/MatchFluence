@@ -107,5 +107,19 @@ namespace BackendAPI.Services
                 Two-sentence match explanation:
                 """;
         }
-    }
+    
+        public async Task<List<BackendAPI.Models.DTO.MatchResult>> RankAndReasonAsync(
+            BackendAPI.Models.DTO.MatchRequest request,
+            List<BackendAPI.Models.DTO.MatchResult> top10)
+        {
+            var top5 = top10.Take(5).ToList();
+            foreach (var result in top5)
+            {
+                try { result.MatchReason = await GenerateReasonAsync(request, result); }
+                catch { result.MatchReason = null; }
+            }
+            return top5;
+        }
 }
+}
+// Appending RankAndReasonAsync to satisfy updated interface
