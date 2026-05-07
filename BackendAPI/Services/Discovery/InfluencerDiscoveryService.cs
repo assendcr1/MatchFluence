@@ -25,91 +25,70 @@ namespace BackendAPI.Services.Discovery
             _logger = logger;
         }
 
-        public async Task RunDiscoveryAsync(CancellationToken ct)
+        // Stage 1 — Hashtag mining replaced by Similar Users via RapidAPI
+        public async Task<List<DiscoveredAccount>> MineHashtagsAsync(
+            string niche,
+            List<string> hashtags,
+            CancellationToken ct)
         {
-            _logger.LogInformation("Starting discovery cycle");
+            // RapidAPI public scraper doesn't support hashtag search
+            // We use Similar Users graph expansion instead
+            _logger.LogInformation("Hashtag mining skipped — using graph expansion for niche: {Niche}", niche);
+            return new List<DiscoveredAccount>();
+        }
 
-            List<string> seedHandles;
-            using (var scope = _scopeFactory.CreateScope())
+        // Stage 2 — Expand from a known influencer via Similar Users + tagged posts
+        public async Task<List<DiscoveredAccount>> ExpandFromInfluencerAsync(
+            Guid influencerId,
+            CancellationToken ct)
+        {
+            using var scope = _scopeFactory.CreateScope();
+            var ctx = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+
+            var influencer = await ctx.Influencers.FindAsync(new object[] { influencerId }, ct);
+            if (influencer == null || string.IsNullOrEmpty(influencer.InstagramHandle))
+                return new List<DiscoveredAccount>();
+
+            var handle = influencer.InstagramHandle.TrimStart('@');
+            var discovered = new List<DiscoveredAccount>();
+
+            // Similar users
+            var similar = await _instagramService.GetSimilarUsersAsync(handle);
+            foreach (var username in similar)
             {
-                var ctx = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-                seedHandles = await ctx.Influencers
-                    .Where(i => i.RefreshPriority == InfluencerThresholds.PriorityHigh
-                                && !string.IsNullOrEmpty(i.InstagramHandle))
-                    .Select(i => i.InstagramHandle!)
-                    .ToListAsync(ct);
+                discovered.Add(new DiscoveredAccount { Handle = username, Source = "SimilarUsers" });
+                await Task.Delay(200, ct);
             }
 
-            _logger.LogInformation("Discovery: {Count} seed influencers", seedHandles.Count);
-
-            int discovered = 0;
-            foreach (var handle in seedHandles)
+            // Tagged users from posts
+            var tagged = await _instagramService.GetTaggedUsersAsync(handle);
+            foreach (var username in tagged)
             {
-                if (ct.IsCancellationRequested) break;
-                try
-                {
-                    var similar = await _instagramService.GetSimilarUsersAsync(handle);
-                    foreach (var candidate in similar)
-                    {
-                        if (ct.IsCancellationRequested) break;
-                        if (await TryIngestAsync(candidate, handle, ct)) discovered++;
-                        await Task.Delay(ThrottleDelay, ct);
-                    }
-
-                    var tagged = await _instagramService.GetTaggedUsersAsync(handle);
-                    foreach (var candidate in tagged)
-                    {
-                        if (ct.IsCancellationRequested) break;
-                        if (await TryIngestAsync(candidate, handle, ct)) discovered++;
-                        await Task.Delay(ThrottleDelay, ct);
-                    }
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogError(ex, "Discovery error for @{Handle}", handle);
-                }
-                await Task.Delay(ThrottleDelay, ct);
+                if (!discovered.Any(d => d.Handle == username))
+                    discovered.Add(new DiscoveredAccount { Handle = username, Source = "TaggedInPost" });
+                await Task.Delay(200, ct);
             }
 
-            _logger.LogInformation("Discovery complete. {Count} new influencers added", discovered);
+            _logger.LogInformation("Expanded from @{Handle}: {Count} candidates", handle, discovered.Count);
+            return discovered;
         }
 
-        // Required by IInfluencerDiscoveryService — delegates to RunDiscoveryAsync
-        public async Task<List<string>> DiscoverFromHashtagAsync(string hashtag, CancellationToken ct)
-        {
-            // Hashtag discovery not available via public scraper
-            // Use graph expansion instead
-            _logger.LogInformation("Hashtag discovery skipped — using graph expansion");
-            return new List<string>();
-        }
-
-        public async Task IngestAccountAsync(string username, Guid? discoveredFromId, CancellationToken ct)
-        {
-            await TryIngestAsync(username, "", ct);
-        }
-
-        private async Task<bool> TryIngestAsync(
-            string username,
-            string discoveredFromHandle,
+        // Stage 3 — Qualify an account against thresholds
+        public async Task<DiscoveredAccount?> QualifyAccountAsync(
+            string handle,
             CancellationToken ct)
         {
             try
             {
-                using var scope = _scopeFactory.CreateScope();
-                var ctx = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-
-                var clean = username.TrimStart('@').ToLower();
-
-                var exists = await ctx.Influencers
-                    .AnyAsync(i => i.InstagramHandle == "@" + clean ||
-                                   i.DisplayName == clean, ct);
-                if (exists) return false;
-
+                var clean = handle.TrimStart('@').ToLower();
                 var profile = await _instagramService.GetPublicProfileAsync(clean);
-                if (profile == null) return false;
+                if (profile == null) return null;
 
                 if (profile.FollowersCount < InfluencerThresholds.MinFollowers)
-                    return false;
+                {
+                    _logger.LogDebug("@{Handle} below threshold ({Count} followers)", clean, profile.FollowersCount);
+                    return null;
+                }
 
                 var media = await _instagramService.GetMediaAsync(clean);
                 await Task.Delay(500, ct);
@@ -130,43 +109,129 @@ namespace BackendAPI.Services.Discovery
                     accountAgeDays: 365,
                     previousFollowerCount: null);
 
-                var seedInfluencer = string.IsNullOrEmpty(discoveredFromHandle) ? null :
-                    await ctx.Influencers.FirstOrDefaultAsync(
-                        i => i.InstagramHandle == "@" + discoveredFromHandle.TrimStart('@'), ct);
-
-                var newInfluencer = new Influencer
+                return new DiscoveredAccount
                 {
-                    Name = profile.Name ?? profile.Username,
-                    DisplayName = profile.Username,
-                    Platform = "Instagram",
-                    InstagramHandle = "@" + clean,
+                    Handle = clean,
+                    Name = profile.Name ?? clean,
                     FollowerCount = profile.FollowersCount,
+                    FollowingCount = profile.FollowsCount,
                     EngagementRate = engagementRate,
                     BotScore = botScore,
-                    NicheId = seedInfluencer?.NicheId ?? 1,
-                    MarketId = seedInfluencer?.MarketId ?? 1,
-                    RefreshPriority = InfluencerThresholds.PriorityLow,
+                    PostCount = profile.MediaCount,
                     IsVerified = profile.IsVerified,
-                    DiscoverySource = "GraphExpansion",
-                    DiscoveredFromInfluencerId = seedInfluencer?.Id,
+                    Source = "GraphExpansion"
+                };
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Qualify failed for @{Handle}", handle);
+                return null;
+            }
+        }
+
+        // Stage 4 — Write qualified account to Influencers table
+        public async Task<Guid?> IngestAccountAsync(
+            DiscoveredAccount account,
+            int nicheId,
+            int marketId,
+            CancellationToken ct)
+        {
+            try
+            {
+                using var scope = _scopeFactory.CreateScope();
+                var ctx = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+
+                var clean = account.Handle.TrimStart('@').ToLower();
+
+                var exists = await ctx.Influencers
+                    .AnyAsync(i => i.InstagramHandle == "@" + clean ||
+                                   i.DisplayName == clean, ct);
+                if (exists) return null;
+
+                var influencer = new Influencer
+                {
+                    Name = account.Name ?? clean,
+                    DisplayName = clean,
+                    Platform = "Instagram",
+                    InstagramHandle = "@" + clean,
+                    FollowerCount = account.FollowerCount,
+                    EngagementRate = account.EngagementRate,
+                    BotScore = account.BotScore,
+                    NicheId = nicheId,
+                    MarketId = marketId,
+                    RefreshPriority = InfluencerThresholds.PriorityLow,
+                    IsVerified = account.IsVerified,
+                    DiscoverySource = account.Source ?? "GraphExpansion",
                     LastDataRefresh = DateTime.UtcNow,
                     NextRefreshDue = DateTime.UtcNow.AddHours(InfluencerThresholds.LowPriorityRefreshHours),
                     Email = $"{clean}@placeholder.com"
                 };
 
-                ctx.Influencers.Add(newInfluencer);
+                ctx.Influencers.Add(influencer);
                 await ctx.SaveChangesAsync(ct);
 
-                _logger.LogInformation("✓ Discovered @{Username} ({Followers} followers)",
-                    clean, profile.FollowersCount);
+                _logger.LogInformation("✓ Ingested @{Handle} ({Followers} followers)",
+                    clean, account.FollowerCount);
 
-                return true;
+                return influencer.Id;
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Ingest failed for @{Username}", username);
-                return false;
+                _logger.LogError(ex, "Ingest failed for @{Handle}", account.Handle);
+                return null;
             }
+        }
+
+        // Full discovery cycle — runs all stages for all High Priority seeds
+        public async Task RunDiscoveryCycleAsync(CancellationToken ct)
+        {
+            _logger.LogInformation("Starting full discovery cycle");
+
+            List<Influencer> seeds;
+            using (var scope = _scopeFactory.CreateScope())
+            {
+                var ctx = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+                seeds = await ctx.Influencers
+                    .Where(i => i.RefreshPriority == InfluencerThresholds.PriorityHigh
+                                && !string.IsNullOrEmpty(i.InstagramHandle))
+                    .ToListAsync(ct);
+            }
+
+            _logger.LogInformation("Discovery: {Count} seed influencers", seeds.Count);
+
+            int discovered = 0;
+            foreach (var seed in seeds)
+            {
+                if (ct.IsCancellationRequested) break;
+
+                try
+                {
+                    var candidates = await ExpandFromInfluencerAsync(seed.Id, ct);
+
+                    foreach (var candidate in candidates)
+                    {
+                        if (ct.IsCancellationRequested) break;
+
+                        var qualified = await QualifyAccountAsync(candidate.Handle, ct);
+                        if (qualified == null) continue;
+
+                        var id = await IngestAccountAsync(
+                            qualified, seed.NicheId, seed.MarketId, ct);
+
+                        if (id.HasValue) discovered++;
+
+                        await Task.Delay(ThrottleDelay, ct);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Discovery error for seed {Id}", seed.Id);
+                }
+
+                await Task.Delay(ThrottleDelay, ct);
+            }
+
+            _logger.LogInformation("Discovery cycle complete. {Count} new influencers added", discovered);
         }
     }
 }
