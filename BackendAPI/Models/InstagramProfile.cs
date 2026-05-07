@@ -12,6 +12,7 @@ namespace BackendAPI.Models
 
         [JsonPropertyName("username")]
         public string Username { get; set; }
+    public bool IsVerified { get; set; }
 
         [JsonPropertyName("name")]
         public string Name { get; set; }
