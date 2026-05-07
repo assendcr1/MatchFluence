@@ -49,8 +49,8 @@ namespace BackendAPI.Services
                 var prompt = "You are an influencer marketing analyst specializing in African markets.\n\n" +
                     "Campaign: " + request.CampaignTitle + "\n" +
                     "Description: " + request.CampaignDescription + "\n" +
-                    "Niche: " + (request.NicheName ?? "General") + "\n" +
-                    "Market: " + (request.MarketName ?? "South Africa") + "\n" +
+                    "Niche: " + (request.NicheId.HasValue ? "Niche " + request.NicheId.ToString() : "General") + "\n" +
+                    "Market: " + (request.MarketId.HasValue ? "Market " + request.MarketId.ToString() : "South Africa") + "\n" +
                     "Platform: " + request.TargetPlatform + "\n" +
                     "Follower Range: " + request.MinimumFollowers.ToString("N0") + " - " + request.MaximumFollowers.ToString("N0") + "\n\n" +
                     "Top 10 Candidates:\n" + candidateList + "\n\n" +

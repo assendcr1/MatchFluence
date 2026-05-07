@@ -53,7 +53,7 @@ namespace BackendAPI.Controllers
         public async Task<IActionResult> ExportCampaigns()
         {
             var campaigns = await _context.Campaigns
-                .Include(c => c.CampaignInfluencers)
+                .Include(c => c.MatchedInfluencers)
                     .ThenInclude(ci => ci.Influencer)
                 .OrderByDescending(c => c.StartDate)
                 .ToListAsync();
@@ -63,8 +63,8 @@ namespace BackendAPI.Controllers
 
             foreach (var c in campaigns)
             {
-                var matched = string.Join("|", c.CampaignInfluencers
-                    .Select(ci => $"@{ci.Influencer?.InstagramHandle?.TrimStart('@')}({ci.MatchScore})"));
+                var matched = string.Join("|", c.MatchedInfluencers
+                    .Select(ci => $"@{ci.Influencer!.InstagramHandle?.TrimStart('@')}({ci.MatchScore})"));
 
                 csv.AppendLine($"{EscapeCsv(c.Title)}," +
                     $"{c.TargetPlatform}," +
