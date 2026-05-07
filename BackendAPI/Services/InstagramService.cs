@@ -6,123 +6,243 @@ namespace BackendAPI.Services
     public class InstagramService : IInstagramService
     {
         private readonly HttpClient _httpClient;
-        private readonly string _accessToken;
+        private readonly string _rapidApiKey;
+        private readonly string _rapidApiHost;
         private readonly ILogger<InstagramService> _logger;
 
-        // Shared deserialiser options — case-insensitive to handle
-        // the Graph API's snake_case field names
-        private static readonly JsonSerializerOptions _jsonOptions = new()
-        {
-            PropertyNameCaseInsensitive = true
-        };
+        private const string BaseUrl = "https://instagram-public-bulk-scraper.p.rapidapi.com";
 
-        public InstagramService(HttpClient httpClient, IConfiguration config, ILogger<InstagramService> logger)
+        public InstagramService(
+            HttpClient httpClient,
+            IConfiguration config,
+            ILogger<InstagramService> logger)
         {
             _httpClient = httpClient;
+            _rapidApiKey = config["RapidApiSettings:Key"] ?? "";
+            _rapidApiHost = config["RapidApiSettings:Host"] ?? "instagram-public-bulk-scraper.p.rapidapi.com";
             _logger = logger;
 
-            _accessToken = config["InstagramSettings:AccessToken"]
-                ?? throw new InvalidOperationException(
-                    "InstagramSettings:AccessToken is not configured. " +
-                    "Add it to appsettings.json or user secrets.");
+            _httpClient.DefaultRequestHeaders.Clear();
+            _httpClient.DefaultRequestHeaders.Add("X-RapidAPI-Key", _rapidApiKey);
+            _httpClient.DefaultRequestHeaders.Add("X-RapidAPI-Host", _rapidApiHost);
         }
 
-        public async Task<InstagramProfile> GetProfileAsync(string userId)
+        // ── Get profile by username via RapidAPI ─────────────────────────
+        public async Task<InstagramProfile?> GetPublicProfileAsync(string username)
         {
-            string url = $"https://graph.facebook.com/v19.0/{userId}" +
-                         $"?fields=id,username,name,profile_picture_url,followers_count,follows_count,media_count" +
-                         $"&access_token={_accessToken}";
-
-            var response = await _httpClient.GetAsync(url);
-
-            if (!response.IsSuccessStatusCode)
+            try
             {
-                _logger.LogError("Instagram API error fetching profile for {UserId}: {StatusCode}",
-                    userId, response.StatusCode);
-                throw new Exception($"Instagram API error: {response.StatusCode}");
+                var clean = username.TrimStart('@').ToLower();
+                var url = $"{BaseUrl}/v1/user_info_by_username?username={clean}";
+
+                var response = await _httpClient.GetAsync(url);
+                if (!response.IsSuccessStatusCode)
+                {
+                    var err = await response.Content.ReadAsStringAsync();
+                    _logger.LogWarning("RapidAPI profile error for @{Username}: {Error}", clean, err);
+                    return null;
+                }
+
+                var json = await response.Content.ReadAsStringAsync();
+                using var doc = JsonDocument.Parse(json);
+
+                if (!doc.RootElement.TryGetProperty("data", out var data))
+                    return null;
+
+                var followers = data.TryGetProperty("edge_followed_by", out var efb)
+                    && efb.TryGetProperty("count", out var fc) ? fc.GetInt32() : 0;
+
+                var following = data.TryGetProperty("edge_follow", out var ef)
+                    && ef.TryGetProperty("count", out var fwc) ? fwc.GetInt32() : 0;
+
+                var posts = data.TryGetProperty("edge_owner_to_timeline_media", out var eotm)
+                    && eotm.TryGetProperty("count", out var pc) ? pc.GetInt32() : 0;
+
+                var uname = data.TryGetProperty("username", out var u) ? u.GetString() ?? clean : clean;
+                var fullName = data.TryGetProperty("full_name", out var fn) ? fn.GetString() ?? "" : "";
+                var isVerified = data.TryGetProperty("is_verified", out var iv) && iv.GetBoolean();
+
+                return new InstagramProfile
+                {
+                    Id = data.TryGetProperty("id", out var id) ? id.GetString() ?? "" : "",
+                    Username = uname,
+                    Name = fullName,
+                    FollowersCount = followers,
+                    FollowsCount = following,
+                    MediaCount = posts,
+                    IsVerified = isVerified
+                };
             }
-
-            var content = await response.Content.ReadAsStringAsync();
-            var profile = JsonSerializer.Deserialize<InstagramProfile>(content, _jsonOptions);
-
-            return profile ?? throw new Exception($"Failed to deserialise profile for {userId}");
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "RapidAPI error for @{Username}", username);
+                return null;
+            }
         }
 
-        public async Task<List<InstagramMedia>> GetMediaAsync(string userId)
+        // ── Get profile for connected influencer (has their own token) ────
+        public async Task<InstagramProfile?> GetProfileAsync(string userId)
         {
-            string url = $"https://graph.facebook.com/v19.0/{userId}/media" +
-                         $"?fields=id,caption,media_type,media_url,permalink,timestamp,like_count,comments_count" +
-                         $"&access_token={_accessToken}";
-
-            var response = await _httpClient.GetAsync(url);
-
-            if (!response.IsSuccessStatusCode)
-            {
-                _logger.LogError("Instagram API error fetching media for {UserId}: {StatusCode}",
-                    userId, response.StatusCode);
-                throw new Exception($"Instagram API error: {response.StatusCode}");
-            }
-
-            var content = await response.Content.ReadAsStringAsync();
-            var responseObject = JsonSerializer.Deserialize<MediaResponse>(content, _jsonOptions);
-
-            return responseObject?.Data ?? new List<InstagramMedia>();
+            // For connected accounts, still try RapidAPI with their handle
+            return await GetPublicProfileAsync(userId);
         }
 
-        // Fixed — was returning raw string JSON
+        // ── Get recent media ──────────────────────────────────────────────
+        public async Task<List<InstagramMedia>> GetMediaAsync(string username)
+        {
+            try
+            {
+                var clean = username.TrimStart('@').ToLower();
+                var url = $"{BaseUrl}/v1/user_posts_v2?username={clean}";
+
+                var response = await _httpClient.GetAsync(url);
+                if (!response.IsSuccessStatusCode) return new();
+
+                var json = await response.Content.ReadAsStringAsync();
+                using var doc = JsonDocument.Parse(json);
+
+                if (!doc.RootElement.TryGetProperty("data", out var data))
+                    return new();
+
+                if (!data.TryGetProperty("edge_owner_to_timeline_media", out var eotm))
+                    return new();
+
+                if (!eotm.TryGetProperty("edges", out var edges))
+                    return new();
+
+                var media = new List<InstagramMedia>();
+
+                foreach (var edge in edges.EnumerateArray().Take(10))
+                {
+                    if (!edge.TryGetProperty("node", out var node)) continue;
+
+                    var likes = node.TryGetProperty("edge_liked_by", out var elb)
+                        && elb.TryGetProperty("count", out var lc) ? lc.GetInt32() : 0;
+
+                    var comments = node.TryGetProperty("edge_media_to_comment", out var emc)
+                        && emc.TryGetProperty("count", out var cc) ? cc.GetInt32() : 0;
+
+                    var mediaType = node.TryGetProperty("__typename", out var mt)
+                        ? mt.GetString() ?? "" : "";
+
+                    media.Add(new InstagramMedia
+                    {
+                        Id = node.TryGetProperty("id", out var id) ? id.GetString() ?? "" : "",
+                        LikeCount = likes,
+                        CommentsCount = comments,
+                        MediaType = mediaType
+                    });
+                }
+
+                return media;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "RapidAPI media error for @{Username}", username);
+                return new();
+            }
+        }
+
+        // ── Get similar/related users for graph expansion ─────────────────
+        public async Task<List<string>> GetSimilarUsersAsync(string username)
+        {
+            try
+            {
+                var clean = username.TrimStart('@').ToLower();
+                var url = $"{BaseUrl}/v1/similar_users?username={clean}";
+
+                var response = await _httpClient.GetAsync(url);
+                if (!response.IsSuccessStatusCode) return new();
+
+                var json = await response.Content.ReadAsStringAsync();
+                using var doc = JsonDocument.Parse(json);
+
+                if (!doc.RootElement.TryGetProperty("data", out var data))
+                    return new();
+
+                var usernames = new List<string>();
+
+                foreach (var item in data.EnumerateArray().Take(20))
+                {
+                    if (item.TryGetProperty("username", out var u))
+                    {
+                        var uname = u.GetString();
+                        if (!string.IsNullOrEmpty(uname))
+                            usernames.Add(uname);
+                    }
+                }
+
+                return usernames;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Similar users error for @{Username}", username);
+                return new();
+            }
+        }
+
+        // ── Extract tagged users from recent posts ────────────────────────
+        public async Task<List<string>> GetTaggedUsersAsync(string username)
+        {
+            try
+            {
+                var clean = username.TrimStart('@').ToLower();
+                var url = $"{BaseUrl}/v1/user_posts_v2?username={clean}";
+
+                var response = await _httpClient.GetAsync(url);
+                if (!response.IsSuccessStatusCode) return new();
+
+                var json = await response.Content.ReadAsStringAsync();
+                using var doc = JsonDocument.Parse(json);
+
+                if (!doc.RootElement.TryGetProperty("data", out var data))
+                    return new();
+
+                if (!data.TryGetProperty("edge_owner_to_timeline_media", out var eotm))
+                    return new();
+
+                if (!eotm.TryGetProperty("edges", out var edges))
+                    return new();
+
+                var tagged = new HashSet<string>();
+
+                foreach (var edge in edges.EnumerateArray().Take(10))
+                {
+                    if (!edge.TryGetProperty("node", out var node)) continue;
+                    if (!node.TryGetProperty("edge_media_to_tagged_user", out var taggedUsers)) continue;
+                    if (!taggedUsers.TryGetProperty("edges", out var tagEdges)) continue;
+
+                    foreach (var tagEdge in tagEdges.EnumerateArray())
+                    {
+                        if (!tagEdge.TryGetProperty("node", out var tagNode)) continue;
+                        if (!tagNode.TryGetProperty("user", out var user)) continue;
+                        if (!user.TryGetProperty("username", out var uname)) continue;
+
+                        var u = uname.GetString();
+                        if (!string.IsNullOrEmpty(u))
+                            tagged.Add(u);
+                    }
+                }
+
+                return tagged.ToList();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Tagged users error for @{Username}", username);
+                return new();
+            }
+        }
+
         public async Task<MediaInsights?> GetMediaInsightsAsync(string mediaId)
         {
-            try
-            {
-                string url = $"https://graph.facebook.com/{mediaId}/insights" +
-                             $"?metric=impressions,reach,engagement,saved,video_views,replies" +
-                             $"&access_token={_accessToken}";
-
-                var response = await _httpClient.GetAsync(url);
-
-                if (!response.IsSuccessStatusCode)
-                {
-                    _logger.LogError("Instagram API error fetching media insights for {MediaId}: {StatusCode}",
-                        mediaId, response.StatusCode);
-                    return null;
-                }
-
-                var content = await response.Content.ReadAsStringAsync();
-                return JsonSerializer.Deserialize<MediaInsights>(content, _jsonOptions);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Exception fetching media insights for {MediaId}", mediaId);
-                return null;
-            }
+            // Not available via public scraper — requires connected account
+            return null;
         }
 
-        // Fixed — was returning raw string JSON
         public async Task<AccountInsights?> GetAccountInsightsAsync(string userId)
         {
-            try
-            {
-                string url = $"https://graph.facebook.com/{userId}/insights" +
-                             $"?metric=impressions,reach,profile_views,website_clicks" +
-                             $"&access_token={_accessToken}";
-
-                var response = await _httpClient.GetAsync(url);
-
-                if (!response.IsSuccessStatusCode)
-                {
-                    _logger.LogError("Instagram API error fetching account insights for {UserId}: {StatusCode}",
-                        userId, response.StatusCode);
-                    return null;
-                }
-
-                var content = await response.Content.ReadAsStringAsync();
-                return JsonSerializer.Deserialize<AccountInsights>(content, _jsonOptions);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Exception fetching account insights for {UserId}", userId);
-                return null;
-            }
+            // Not available via public scraper — requires connected account
+            return null;
         }
     }
 }
