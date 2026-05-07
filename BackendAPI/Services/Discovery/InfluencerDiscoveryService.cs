@@ -13,13 +13,29 @@ namespace BackendAPI.Services.Discovery
 
         private static readonly TimeSpan ThrottleDelay = TimeSpan.FromSeconds(2);
 
-        // SA brand accounts — their posts tag real SA influencers
-        private static readonly List<string> SaBrandAccounts = new()
+        // Seed SA brand accounts mapped to niche IDs
+        private static readonly Dictionary<string, int> SaBrandAccountNiches = new()
         {
-            "woolworths_sa", "nandossa", "checkers_sa", "disneyplussouthafrica",
-            "puma_za", "adidasza", "nikesouthafrica", "showmax",
-            "discoverysa", "standardbankza", "fnbsouthafrica", "nedbank",
-            "mtnza", "vodacomsa", "telkomsa", "multichoiceza"
+            { "woolworths_sa", 2 }, { "woolworths_food", 3 }, { "nandossa", 3 },
+            { "checkers_sa", 3 }, { "disneyplussouthafrica", 7 }, { "puma_za", 1 },
+            { "adidasza", 1 }, { "nikesouthafrica", 1 }, { "showmax", 7 },
+            { "discoverysa", 9 }, { "standardbankza", 9 }, { "fnbsouthafrica", 9 },
+            { "nedbank", 9 }, { "mtnza", 5 }, { "vodacomsa", 5 }, { "telkomsa", 5 },
+            { "multichoiceza", 7 }, { "superbalistsa", 2 }, { "mrpricesa", 2 },
+            { "cottonon_za", 2 }, { "spur_sa", 3 }, { "steers_sa", 3 },
+            { "kfcsouthafrica", 3 }, { "discoverysport", 1 }, { "capitecbank", 9 },
+            { "absasouthafrica", 9 },
+        };
+
+        // Brand category keywords from Instagram
+        private static readonly HashSet<string> BrandCategoryKeywords = new(StringComparer.OrdinalIgnoreCase)
+        {
+            "retail", "shopping", "brand", "company", "organization", "organisation",
+            "media", "news", "sports", "government", "restaurant", "food service",
+            "automotive", "finance", "bank", "insurance", "telecom", "airline",
+            "hotel", "travel agency", "software", "product", "service",
+            "clothing", "cosmetics", "beauty supply", "grocery", "supermarket",
+            "sport", "football", "cricket", "rugby", "soccer"
         };
 
         public InfluencerDiscoveryService(
@@ -34,6 +50,39 @@ namespace BackendAPI.Services.Discovery
             _logger = logger;
         }
 
+        // ── Brand detection ───────────────────────────────────────────────
+        private bool IsBrandAccount(InstagramProfile profile)
+        {
+            // Check Instagram category name
+            if (!string.IsNullOrEmpty(profile.CategoryName))
+            {
+                foreach (var keyword in BrandCategoryKeywords)
+                    if (profile.CategoryName.Contains(keyword, StringComparison.OrdinalIgnoreCase))
+                    {
+                        _logger.LogDebug("@{Username} rejected — brand category: {Category}",
+                            profile.Username, profile.CategoryName);
+                        return true;
+                    }
+            }
+
+            // Business account with very low following ratio = brand
+            if (profile.IsBusinessAccount && profile.FollowersCount > 10000
+                && profile.FollowsCount < 200)
+                return true;
+
+            // Brand username patterns with high followers
+            var brandSuffixes = new[] { "_sa", "_za", "_official", "_store", "_shop",
+                                        "_fc", "_sports", "_football", "_cricket" };
+            foreach (var suffix in brandSuffixes)
+                if ((profile.Username.EndsWith(suffix) || profile.Username.StartsWith(suffix.TrimStart('_')))
+                    && profile.IsBusinessAccount
+                    && profile.FollowersCount > 20000)
+                    return true;
+
+            return false;
+        }
+
+        // ── Interface methods ─────────────────────────────────────────────
         public async Task<List<DiscoveredAccount>> MineHashtagsAsync(
             string niche, List<string> hashtags, CancellationToken ct)
         {
@@ -52,20 +101,13 @@ namespace BackendAPI.Services.Discovery
                 return new List<DiscoveredAccount>();
 
             var handle = influencer.InstagramHandle.TrimStart('@');
-            var discovered = new List<DiscoveredAccount>();
-
-            // Extract tagged users from the influencer's own posts
             var tagged = await _instagramService.GetTaggedUsersAsync(handle);
-            foreach (var username in tagged)
+            var discovered = tagged.Select(u => new DiscoveredAccount
             {
-                discovered.Add(new DiscoveredAccount
-                {
-                    Handle = username,
-                    Name = username,
-                    DiscoverySource = "TaggedInPost",
-                    DiscoveredFromInfluencerId = influencerId
-                });
-            }
+                Handle = u, Name = u,
+                DiscoverySource = "TaggedInPost",
+                DiscoveredFromInfluencerId = influencerId
+            }).ToList();
 
             _logger.LogInformation("Expanded from @{Handle}: {Count} candidates", handle, discovered.Count);
             return discovered;
@@ -79,6 +121,14 @@ namespace BackendAPI.Services.Discovery
                 var clean = handle.TrimStart('@').ToLower();
                 var profile = await _instagramService.GetPublicProfileAsync(clean);
                 if (profile == null) return null;
+
+                // Reject brand accounts using smart detection
+                if (IsBrandAccount(profile))
+                {
+                    _logger.LogInformation("Skipping brand @{Handle} (category: {Category}, business: {IsBusiness})",
+                        clean, profile.CategoryName, profile.IsBusinessAccount);
+                    return null;
+                }
 
                 if (profile.FollowersCount < InfluencerThresholds.MinFollowers)
                     return null;
@@ -121,7 +171,6 @@ namespace BackendAPI.Services.Discovery
                 var ctx = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
 
                 var clean = account.Handle.TrimStart('@').ToLower();
-
                 var exists = await ctx.Influencers
                     .AnyAsync(i => i.InstagramHandle == "@" + clean ||
                                    i.DisplayName == clean, ct);
@@ -158,8 +207,8 @@ namespace BackendAPI.Services.Discovery
                 ctx.Influencers.Add(influencer);
                 await ctx.SaveChangesAsync(CancellationToken.None);
 
-                _logger.LogInformation("✓ Ingested @{Handle} ({Followers} followers)",
-                    clean, account.FollowerCount);
+                _logger.LogInformation("✓ Ingested @{Handle} ({Followers} followers, niche {NicheId})",
+                    clean, account.FollowerCount, nicheId);
 
                 return influencer.Id;
             }
@@ -172,70 +221,110 @@ namespace BackendAPI.Services.Discovery
 
         public async Task RunDiscoveryCycleAsync(CancellationToken ct)
         {
-            _logger.LogInformation("Starting discovery cycle — SA brand account strategy");
-
+            _logger.LogInformation("Starting discovery cycle");
             int discovered = 0;
 
-            // Strategy 1: Extract tagged users from SA brand posts
-            foreach (var brandAccount in SaBrandAccounts)
+            // ── Step 1: Mine hardcoded SA brand accounts ──────────────────
+            foreach (var brandEntry in SaBrandAccountNiches)
             {
                 if (ct.IsCancellationRequested) break;
+                var brandHandle = brandEntry.Key;
+                var nicheId = brandEntry.Value;
+
                 try
                 {
-                    _logger.LogInformation("Mining brand account @{Brand}", brandAccount);
-                    var tagged = await _instagramService.GetTaggedUsersAsync(brandAccount);
-                    _logger.LogInformation("@{Brand}: {Count} tagged users found", brandAccount, tagged.Count);
+                    _logger.LogInformation("Mining brand @{Brand}", brandHandle);
+                    var tagged = await _instagramService.GetTaggedUsersAsync(brandHandle);
+                    _logger.LogInformation("@{Brand}: {Count} tagged users", brandHandle, tagged.Count);
 
                     foreach (var candidate in tagged)
                     {
                         if (ct.IsCancellationRequested) break;
                         var qualified = await QualifyAccountAsync(candidate, ct);
                         if (qualified == null) continue;
-
-                        var id = await IngestAccountAsync(qualified, 1, 1, ct);
+                        var id = await IngestAccountAsync(qualified, nicheId, 1, ct);
                         if (id.HasValue) discovered++;
                         await Task.Delay(ThrottleDelay, ct);
                     }
                 }
-                catch (Exception ex)
-                {
-                    _logger.LogError(ex, "Error mining brand @{Brand}", brandAccount);
-                }
+                catch (Exception ex) { _logger.LogError(ex, "Error mining @{Brand}", brandHandle); }
                 await Task.Delay(ThrottleDelay, ct);
             }
 
-            // Strategy 2: Expand from existing seed influencers tagged posts
-            List<Influencer> seeds;
+            // ── Step 2: Mine ALL influencers in database for dynamic brands ─
+            List<Influencer> allInfluencers;
             using (var scope = _scopeFactory.CreateScope())
             {
                 var ctx = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-                seeds = await ctx.Influencers
-                    .Where(i => i.RefreshPriority == InfluencerThresholds.PriorityHigh
-                                && !string.IsNullOrEmpty(i.InstagramHandle))
+                allInfluencers = await ctx.Influencers
+                    .Where(i => !string.IsNullOrEmpty(i.InstagramHandle))
                     .ToListAsync(ct);
             }
 
-            foreach (var seed in seeds)
+            _logger.LogInformation("Dynamic expansion from {Count} influencers", allInfluencers.Count);
+
+            var dynamicBrands = new Dictionary<string, int>();
+
+            foreach (var influencer in allInfluencers)
+            {
+                if (ct.IsCancellationRequested) break;
+                var handle = influencer.InstagramHandle!.TrimStart('@');
+
+                try
+                {
+                    var tagged = await _instagramService.GetTaggedUsersAsync(handle);
+                    foreach (var taggedHandle in tagged)
+                    {
+                        if (dynamicBrands.ContainsKey(taggedHandle)) continue;
+
+                        var profile = await _instagramService.GetPublicProfileAsync(taggedHandle);
+                        if (profile == null) continue;
+                        await Task.Delay(500, ct);
+
+                        if (profile.IsBusinessAccount && profile.FollowersCount > 10000)
+                        {
+                            dynamicBrands[taggedHandle] = influencer.NicheId;
+                            _logger.LogInformation("Found brand @{Brand} (category: {Cat}) from @{Influencer}",
+                                taggedHandle, profile.CategoryName, handle);
+                        }
+                        else
+                        {
+                            // It's a person — try to qualify and ingest directly
+                            var qualified = await QualifyAccountAsync(taggedHandle, ct);
+                            if (qualified != null)
+                            {
+                                qualified.DiscoveredFromInfluencerId = influencer.Id;
+                                var id = await IngestAccountAsync(qualified, influencer.NicheId, influencer.MarketId, ct);
+                                if (id.HasValue) discovered++;
+                            }
+                        }
+                        await Task.Delay(ThrottleDelay, ct);
+                    }
+                }
+                catch (Exception ex) { _logger.LogError(ex, "Expansion error for @{Handle}", handle); }
+                await Task.Delay(ThrottleDelay, ct);
+            }
+
+            // ── Step 3: Mine dynamically discovered brands ────────────────
+            _logger.LogInformation("Mining {Count} dynamically discovered brands", dynamicBrands.Count);
+
+            foreach (var brandEntry in dynamicBrands)
             {
                 if (ct.IsCancellationRequested) break;
                 try
                 {
-                    var candidates = await ExpandFromInfluencerAsync(seed.Id, ct);
-                    foreach (var candidate in candidates)
+                    var tagged = await _instagramService.GetTaggedUsersAsync(brandEntry.Key);
+                    foreach (var candidate in tagged)
                     {
                         if (ct.IsCancellationRequested) break;
-                        var qualified = await QualifyAccountAsync(candidate.Handle, ct);
+                        var qualified = await QualifyAccountAsync(candidate, ct);
                         if (qualified == null) continue;
-                        qualified.DiscoveredFromInfluencerId = seed.Id;
-                        var id = await IngestAccountAsync(qualified, seed.NicheId, seed.MarketId, ct);
+                        var id = await IngestAccountAsync(qualified, brandEntry.Value, 1, ct);
                         if (id.HasValue) discovered++;
                         await Task.Delay(ThrottleDelay, ct);
                     }
                 }
-                catch (Exception ex)
-                {
-                    _logger.LogError(ex, "Discovery error for seed {Id}", seed.Id);
-                }
+                catch (Exception ex) { _logger.LogError(ex, "Error mining dynamic brand @{Brand}", brandEntry.Key); }
                 await Task.Delay(ThrottleDelay, ct);
             }
 
