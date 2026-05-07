@@ -22,18 +22,25 @@ namespace BackendAPI.Services
             _rapidApiHost = config["RapidApiSettings:Host"] ?? "instagram-public-bulk-scraper.p.rapidapi.com";
             _logger = logger;
 
-            _httpClient.DefaultRequestHeaders.Clear();
-            _httpClient.DefaultRequestHeaders.Add("X-RapidAPI-Key", _rapidApiKey);
-            _httpClient.DefaultRequestHeaders.Add("X-RapidAPI-Host", _rapidApiHost);
+            if (!_httpClient.DefaultRequestHeaders.Contains("X-RapidAPI-Key"))
+            {
+                _httpClient.DefaultRequestHeaders.Add("X-RapidAPI-Key", _rapidApiKey);
+                _httpClient.DefaultRequestHeaders.Add("X-RapidAPI-Host", _rapidApiHost);
+            }
         }
 
-        // ── Get profile by username via RapidAPI ─────────────────────────
+        public async Task<InstagramProfile?> GetProfileAsync(string userId)
+        {
+            return await GetPublicProfileAsync(userId);
+        }
+
         public async Task<InstagramProfile?> GetPublicProfileAsync(string username)
         {
             try
             {
                 var clean = username.TrimStart('@').ToLower();
-                var url = $"{BaseUrl}/v1/user_info_by_username?username={clean}";
+                // Correct endpoint: /v1/user_info_web?username=handle
+                var url = $"{BaseUrl}/v1/user_info_web?username={clean}";
 
                 var response = await _httpClient.GetAsync(url);
                 if (!response.IsSuccessStatusCode)
@@ -61,10 +68,11 @@ namespace BackendAPI.Services
                 var uname = data.TryGetProperty("username", out var u) ? u.GetString() ?? clean : clean;
                 var fullName = data.TryGetProperty("full_name", out var fn) ? fn.GetString() ?? "" : "";
                 var isVerified = data.TryGetProperty("is_verified", out var iv) && iv.GetBoolean();
+                var igId = data.TryGetProperty("id", out var id) ? id.GetString() ?? "" : "";
 
                 return new InstagramProfile
                 {
-                    Id = data.TryGetProperty("id", out var id) ? id.GetString() ?? "" : "",
+                    Id = igId,
                     Username = uname,
                     Name = fullName,
                     FollowersCount = followers,
@@ -75,25 +83,18 @@ namespace BackendAPI.Services
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "RapidAPI error for @{Username}", username);
+                _logger.LogError(ex, "RapidAPI profile error for @{Username}", username);
                 return null;
             }
         }
 
-        // ── Get profile for connected influencer (has their own token) ────
-        public async Task<InstagramProfile?> GetProfileAsync(string userId)
-        {
-            // For connected accounts, still try RapidAPI with their handle
-            return await GetPublicProfileAsync(userId);
-        }
-
-        // ── Get recent media ──────────────────────────────────────────────
         public async Task<List<InstagramMedia>> GetMediaAsync(string username)
         {
             try
             {
                 var clean = username.TrimStart('@').ToLower();
-                var url = $"{BaseUrl}/v1/user_posts_v2?username={clean}";
+                // Correct endpoint: /v2/user_posts?username_or_id=handle
+                var url = $"{BaseUrl}/v2/user_posts?username_or_id={clean}";
 
                 var response = await _httpClient.GetAsync(url);
                 if (!response.IsSuccessStatusCode) return new();
@@ -104,10 +105,7 @@ namespace BackendAPI.Services
                 if (!doc.RootElement.TryGetProperty("data", out var data))
                     return new();
 
-                if (!data.TryGetProperty("edge_owner_to_timeline_media", out var eotm))
-                    return new();
-
-                if (!eotm.TryGetProperty("edges", out var edges))
+                if (!data.TryGetProperty("edges", out var edges))
                     return new();
 
                 var media = new List<InstagramMedia>();
@@ -143,12 +141,12 @@ namespace BackendAPI.Services
             }
         }
 
-        // ── Get similar/related users for graph expansion ─────────────────
         public async Task<List<string>> GetSimilarUsersAsync(string username)
         {
             try
             {
                 var clean = username.TrimStart('@').ToLower();
+                // Correct endpoint: /v1/similar_users?username=handle
                 var url = $"{BaseUrl}/v1/similar_users?username={clean}";
 
                 var response = await _httpClient.GetAsync(url);
@@ -157,18 +155,22 @@ namespace BackendAPI.Services
                 var json = await response.Content.ReadAsStringAsync();
                 using var doc = JsonDocument.Parse(json);
 
-                if (!doc.RootElement.TryGetProperty("data", out var data))
-                    return new();
-
                 var usernames = new List<string>();
 
-                foreach (var item in data.EnumerateArray().Take(20))
+                // Try data array directly
+                if (doc.RootElement.TryGetProperty("data", out var data))
                 {
-                    if (item.TryGetProperty("username", out var u))
+                    if (data.ValueKind == JsonValueKind.Array)
                     {
-                        var uname = u.GetString();
-                        if (!string.IsNullOrEmpty(uname))
-                            usernames.Add(uname);
+                        foreach (var item in data.EnumerateArray().Take(20))
+                        {
+                            if (item.TryGetProperty("username", out var u))
+                            {
+                                var uname = u.GetString();
+                                if (!string.IsNullOrEmpty(uname))
+                                    usernames.Add(uname);
+                            }
+                        }
                     }
                 }
 
@@ -181,13 +183,12 @@ namespace BackendAPI.Services
             }
         }
 
-        // ── Extract tagged users from recent posts ────────────────────────
         public async Task<List<string>> GetTaggedUsersAsync(string username)
         {
             try
             {
                 var clean = username.TrimStart('@').ToLower();
-                var url = $"{BaseUrl}/v1/user_posts_v2?username={clean}";
+                var url = $"{BaseUrl}/v2/user_posts?username_or_id={clean}";
 
                 var response = await _httpClient.GetAsync(url);
                 if (!response.IsSuccessStatusCode) return new();
@@ -198,10 +199,7 @@ namespace BackendAPI.Services
                 if (!doc.RootElement.TryGetProperty("data", out var data))
                     return new();
 
-                if (!data.TryGetProperty("edge_owner_to_timeline_media", out var eotm))
-                    return new();
-
-                if (!eotm.TryGetProperty("edges", out var edges))
+                if (!data.TryGetProperty("edges", out var edges))
                     return new();
 
                 var tagged = new HashSet<string>();
@@ -235,13 +233,11 @@ namespace BackendAPI.Services
 
         public async Task<MediaInsights?> GetMediaInsightsAsync(string mediaId)
         {
-            // Not available via public scraper — requires connected account
             return null;
         }
 
         public async Task<AccountInsights?> GetAccountInsightsAsync(string userId)
         {
-            // Not available via public scraper — requires connected account
             return null;
         }
     }

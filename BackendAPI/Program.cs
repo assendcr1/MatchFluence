@@ -29,14 +29,15 @@ builder.Services.AddAuthentication(ApiKeyAuthenticationHandler.SchemeName)
 builder.Services.AddAuthorization();
 
 builder.Services.AddScoped<IEmailService, EmailService>();
-builder.Services.AddHttpClient<IInstagramService, InstagramService>();
+builder.Services.AddScoped<IInstagramService, InstagramService>();
+builder.Services.AddHttpClient();
 builder.Services.AddScoped<MessageService>();
 builder.Services.AddScoped<ApiKeyService>();
 builder.Services.AddScoped<IMatchingService, MatchingService>();
 builder.Services.AddScoped<IAIReasoningService, TemplateReasoningService>();
 builder.Services.AddSingleton<BotScoreCalculator>();
 builder.Services.AddScoped<IInfluencerRefreshService, InfluencerRefreshService>();
-builder.Services.AddHttpClient<IInfluencerDiscoveryService, InfluencerDiscoveryService>();
+builder.Services.AddScoped<IInfluencerDiscoveryService, InfluencerDiscoveryService>();
 builder.Services.AddHostedService<DataRefreshBackgroundService>();
 
 var app = builder.Build();
