@@ -41,40 +41,22 @@ namespace BackendAPI.Services
                 client.DefaultRequestHeaders.Add("x-api-key", _apiKey);
                 client.DefaultRequestHeaders.Add("anthropic-version", "2023-06-01");
 
-                // Build candidate list for Claude
                 var candidateList = string.Join("\n", top10.Select((r, i) =>
-                    $"{i + 1}. @{r.InstagramHandle} | {r.FollowerCount:N0} followers | " +
-                    $"{r.EngagementRate}% engagement | {r.BotScore:P0} bots | " +
-                    $"Niche: {r.NicheName} | Market: {r.MarketName} | Score: {r.MatchScore}/100"));
+                    (i + 1) + ". @" + r.InstagramHandle + " | " + r.FollowerCount.ToString("N0") + " followers | " +
+                    r.EngagementRate + "% engagement | " + r.BotScore.ToString("P0") + " bots | " +
+                    "Niche: " + r.NicheName + " | Market: " + r.MarketName + " | Score: " + r.MatchScore + "/100"));
 
-                var prompt = $"""
-                    You are an influencer marketing analyst specializing in African markets, particularly South Africa.
-
-                    Campaign Brief:
-                    Title: {request.CampaignTitle}
-                    Description: {request.CampaignDescription}
-                    Target Niche: {request.NicheName ?? "General"}
-                    Target Market: {request.MarketName ?? "South Africa"}
-                    Platform: {request.TargetPlatform}
-                    Follower Range: {request.MinimumFollowers:N0} - {request.MaximumFollowers:N0}
-
-                    Top 10 Candidates (pre-scored by algorithm):
-                    {candidateList}
-
-                    Select the TOP 5 influencers from this list that would deliver the best ROI for this campaign.
-                    Consider engagement quality, audience authenticity, niche relevance, and market fit.
-
-                    Respond ONLY with valid JSON in this exact format, no other text:
-                    {{
-                      "selections": [
-                        {{
-                          "rank": 1,
-                          "handle": "instagram_handle",
-                          "reason": "2-3 sentence analysis of why this influencer fits this specific campaign"
-                        }}
-                      ]
-                    }}
-                    """;
+                var prompt = "You are an influencer marketing analyst specializing in African markets.\n\n" +
+                    "Campaign: " + request.CampaignTitle + "\n" +
+                    "Description: " + request.CampaignDescription + "\n" +
+                    "Niche: " + (request.NicheName ?? "General") + "\n" +
+                    "Market: " + (request.MarketName ?? "South Africa") + "\n" +
+                    "Platform: " + request.TargetPlatform + "\n" +
+                    "Follower Range: " + request.MinimumFollowers.ToString("N0") + " - " + request.MaximumFollowers.ToString("N0") + "\n\n" +
+                    "Top 10 Candidates:\n" + candidateList + "\n\n" +
+                    "Select the TOP 5 that would deliver the best ROI. " +
+                    "Respond ONLY with valid JSON:\n" +
+                    "{\"selections\":[{\"rank\":1,\"handle\":\"username\",\"reason\":\"2-3 sentence analysis\"}]}";
 
                 var body = new
                 {
@@ -89,9 +71,7 @@ namespace BackendAPI.Services
 
                 if (!response.IsSuccessStatusCode)
                 {
-                    var err = await response.Content.ReadAsStringAsync();
-                    _logger.LogWarning("Claude API error {Status}: {Error}",
-                        response.StatusCode, err);
+                    _logger.LogWarning("Claude API error {Status}", response.StatusCode);
                     return FallbackRank(request, top10);
                 }
 
@@ -104,7 +84,6 @@ namespace BackendAPI.Services
 
                 var text = contentArr[0].GetProperty("text").GetString() ?? "";
 
-                // Parse Claude's JSON response
                 using var resultDoc = JsonDocument.Parse(text);
                 if (!resultDoc.RootElement.TryGetProperty("selections", out var selections))
                     return FallbackRank(request, top10);
@@ -130,21 +109,16 @@ namespace BackendAPI.Services
                     }
                 }
 
-                // If Claude returned fewer than 5 fill from remaining top10
-                if (finalResults.Count < 5)
+                foreach (var remaining in top10)
                 {
-                    foreach (var remaining in top10)
+                    if (finalResults.Count >= 5) break;
+                    if (!finalResults.Any(r => r.InfluencerId == remaining.InfluencerId))
                     {
-                        if (finalResults.Count >= 5) break;
-                        if (!finalResults.Any(r => r.InfluencerId == remaining.InfluencerId))
-                        {
-                            remaining.MatchReason ??= BuildFallbackReason(request, remaining);
-                            finalResults.Add(remaining);
-                        }
+                        remaining.MatchReason ??= BuildFallbackReason(request, remaining);
+                        finalResults.Add(remaining);
                     }
                 }
 
-                _logger.LogInformation("Claude selected and reasoned {Count} influencers", finalResults.Count);
                 return finalResults.Take(5).ToList();
             }
             catch (Exception ex)
@@ -174,9 +148,10 @@ namespace BackendAPI.Services
             var botLabel = result.BotScore <= 0.05m ? "a highly authentic audience"
                 : result.BotScore <= 0.15m ? "a mostly authentic audience"
                 : "some authenticity concerns worth reviewing";
-            return $"{result.DisplayName} is a strong fit for {request.CampaignTitle}, " +
-                   $"with {result.FollowerCount:N0} followers and {engagementLabel} at {result.EngagementRate}%. " +
-                   $"Their audience shows {botLabel} for the {result.MarketName ?? "target"} market.";
+            return result.DisplayName + " is a strong fit for " + request.CampaignTitle + ", " +
+                   "with " + result.FollowerCount.ToString("N0") + " followers and " + engagementLabel +
+                   " at " + result.EngagementRate + "%. Their audience shows " + botLabel +
+                   " for the " + (result.MarketName ?? "target") + " market.";
         }
     }
 }
