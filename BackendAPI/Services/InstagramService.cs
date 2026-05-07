@@ -184,33 +184,44 @@ namespace BackendAPI.Services
                 using var doc = JsonDocument.Parse(json);
 
                 var tagged = new HashSet<string>();
-                JsonElement edges = default;
 
-                if (doc.RootElement.TryGetProperty("data", out var data))
-                {
-                    if (data.TryGetProperty("edges", out var e1)) edges = e1;
-                    else if (data.TryGetProperty("edge_owner_to_timeline_media", out var eotm)
-                             && eotm.TryGetProperty("edges", out var e2)) edges = e2;
-                }
+                // Structure: { data: { items: [ { usertags: { in: [ { user: { username } } ] } } ] } }
+                if (!doc.RootElement.TryGetProperty("data", out var data)) return new();
+                if (!data.TryGetProperty("items", out var items)) return new();
+                if (items.ValueKind != JsonValueKind.Array) return new();
 
-                if (edges.ValueKind == JsonValueKind.Array)
+                foreach (var item in items.EnumerateArray().Take(12))
                 {
-                    foreach (var edge in edges.EnumerateArray().Take(10))
+                    // usertags.in[] contains tagged users
+                    if (item.TryGetProperty("usertags", out var usertags)
+                        && usertags.TryGetProperty("in", out var taggedIn)
+                        && taggedIn.ValueKind == JsonValueKind.Array)
                     {
-                        var node = edge.TryGetProperty("node", out var n) ? n : edge;
-                        if (!node.TryGetProperty("edge_media_to_tagged_user", out var taggedUsers)) continue;
-                        if (!taggedUsers.TryGetProperty("edges", out var tagEdges)) continue;
-
-                        foreach (var tagEdge in tagEdges.EnumerateArray())
+                        foreach (var tag in taggedIn.EnumerateArray())
                         {
-                            var tagNode = tagEdge.TryGetProperty("node", out var tn) ? tn : tagEdge;
-                            var user = tagNode.TryGetProperty("user", out var tu) ? tu : tagNode;
-                            if (user.TryGetProperty("username", out var u) && u.GetString() is string uname)
+                            if (tag.TryGetProperty("user", out var user)
+                                && user.TryGetProperty("username", out var u)
+                                && u.GetString() is string uname
+                                && !string.IsNullOrEmpty(uname))
+                                tagged.Add(uname);
+                        }
+                    }
+
+                    // Also check caption mentions via coauthor_producers
+                    if (item.TryGetProperty("coauthor_producers", out var coauthors)
+                        && coauthors.ValueKind == JsonValueKind.Array)
+                    {
+                        foreach (var coauthor in coauthors.EnumerateArray())
+                        {
+                            if (coauthor.TryGetProperty("username", out var u)
+                                && u.GetString() is string uname
+                                && !string.IsNullOrEmpty(uname))
                                 tagged.Add(uname);
                         }
                     }
                 }
 
+                _logger.LogInformation("Tagged users for @{Username}: {Count} found", clean, tagged.Count);
                 return tagged.ToList();
             }
             catch (Exception ex)
