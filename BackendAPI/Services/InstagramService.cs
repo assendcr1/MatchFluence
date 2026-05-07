@@ -5,7 +5,7 @@ namespace BackendAPI.Services
 {
     public class InstagramService : IInstagramService
     {
-        private readonly HttpClient _httpClient;
+        private readonly IHttpClientFactory _httpClientFactory;
         private readonly string _rapidApiKey;
         private readonly string _rapidApiHost;
         private readonly ILogger<InstagramService> _logger;
@@ -13,36 +13,36 @@ namespace BackendAPI.Services
         private const string BaseUrl = "https://instagram-public-bulk-scraper.p.rapidapi.com";
 
         public InstagramService(
-            HttpClient httpClient,
+            IHttpClientFactory httpClientFactory,
             IConfiguration config,
             ILogger<InstagramService> logger)
         {
-            _httpClient = httpClient;
+            _httpClientFactory = httpClientFactory;
             _rapidApiKey = config["RapidApiSettings:Key"] ?? "";
             _rapidApiHost = config["RapidApiSettings:Host"] ?? "instagram-public-bulk-scraper.p.rapidapi.com";
             _logger = logger;
+        }
 
-            if (!_httpClient.DefaultRequestHeaders.Contains("X-RapidAPI-Key"))
-            {
-                _httpClient.DefaultRequestHeaders.Add("X-RapidAPI-Key", _rapidApiKey);
-                _httpClient.DefaultRequestHeaders.Add("X-RapidAPI-Host", _rapidApiHost);
-            }
+        private HttpClient CreateClient()
+        {
+            var client = _httpClientFactory.CreateClient();
+            client.DefaultRequestHeaders.Clear();
+            client.DefaultRequestHeaders.Add("X-RapidAPI-Key", _rapidApiKey);
+            client.DefaultRequestHeaders.Add("X-RapidAPI-Host", _rapidApiHost);
+            return client;
         }
 
         public async Task<InstagramProfile?> GetProfileAsync(string userId)
-        {
-            return await GetPublicProfileAsync(userId);
-        }
+            => await GetPublicProfileAsync(userId);
 
         public async Task<InstagramProfile?> GetPublicProfileAsync(string username)
         {
             try
             {
                 var clean = username.TrimStart('@').ToLower();
-                // Correct endpoint: /v1/user_info_web?username=handle
-                var url = $"{BaseUrl}/v1/user_info_web?username={clean}";
+                var client = CreateClient();
+                var response = await client.GetAsync($"{BaseUrl}/v1/user_info_web?username={clean}");
 
-                var response = await _httpClient.GetAsync(url);
                 if (!response.IsSuccessStatusCode)
                 {
                     var err = await response.Content.ReadAsStringAsync();
@@ -58,21 +58,19 @@ namespace BackendAPI.Services
 
                 var followers = data.TryGetProperty("edge_followed_by", out var efb)
                     && efb.TryGetProperty("count", out var fc) ? fc.GetInt32() : 0;
-
                 var following = data.TryGetProperty("edge_follow", out var ef)
                     && ef.TryGetProperty("count", out var fwc) ? fwc.GetInt32() : 0;
-
                 var posts = data.TryGetProperty("edge_owner_to_timeline_media", out var eotm)
                     && eotm.TryGetProperty("count", out var pc) ? pc.GetInt32() : 0;
-
                 var uname = data.TryGetProperty("username", out var u) ? u.GetString() ?? clean : clean;
                 var fullName = data.TryGetProperty("full_name", out var fn) ? fn.GetString() ?? "" : "";
                 var isVerified = data.TryGetProperty("is_verified", out var iv) && iv.GetBoolean();
-                var igId = data.TryGetProperty("id", out var id) ? id.GetString() ?? "" : "";
+
+                _logger.LogInformation("✓ @{Username} — {Followers} followers", clean, followers);
 
                 return new InstagramProfile
                 {
-                    Id = igId,
+                    Id = data.TryGetProperty("id", out var id) ? id.GetString() ?? "" : "",
                     Username = uname,
                     Name = fullName,
                     FollowersCount = followers,
@@ -93,42 +91,43 @@ namespace BackendAPI.Services
             try
             {
                 var clean = username.TrimStart('@').ToLower();
-                // Correct endpoint: /v2/user_posts?username_or_id=handle
-                var url = $"{BaseUrl}/v2/user_posts?username_or_id={clean}";
+                var client = CreateClient();
+                var response = await client.GetAsync($"{BaseUrl}/v2/user_posts?username_or_id={clean}");
 
-                var response = await _httpClient.GetAsync(url);
                 if (!response.IsSuccessStatusCode) return new();
 
                 var json = await response.Content.ReadAsStringAsync();
+                _logger.LogDebug("Media response for @{Username}: {Json}", clean, json[..Math.Min(500, json.Length)]);
+
                 using var doc = JsonDocument.Parse(json);
-
-                if (!doc.RootElement.TryGetProperty("data", out var data))
-                    return new();
-
-                if (!data.TryGetProperty("edges", out var edges))
-                    return new();
-
                 var media = new List<InstagramMedia>();
+
+                // Try data.edges first
+                JsonElement edges = default;
+                if (doc.RootElement.TryGetProperty("data", out var data))
+                {
+                    if (data.TryGetProperty("edges", out var e1)) edges = e1;
+                    else if (data.TryGetProperty("edge_owner_to_timeline_media", out var eotm)
+                             && eotm.TryGetProperty("edges", out var e2)) edges = e2;
+                }
+                else if (doc.RootElement.TryGetProperty("edges", out var e3)) edges = e3;
+
+                if (edges.ValueKind != JsonValueKind.Array) return media;
 
                 foreach (var edge in edges.EnumerateArray().Take(10))
                 {
-                    if (!edge.TryGetProperty("node", out var node)) continue;
-
+                    var node = edge.TryGetProperty("node", out var n) ? n : edge;
                     var likes = node.TryGetProperty("edge_liked_by", out var elb)
                         && elb.TryGetProperty("count", out var lc) ? lc.GetInt32() : 0;
-
                     var comments = node.TryGetProperty("edge_media_to_comment", out var emc)
                         && emc.TryGetProperty("count", out var cc) ? cc.GetInt32() : 0;
 
-                    var mediaType = node.TryGetProperty("__typename", out var mt)
-                        ? mt.GetString() ?? "" : "";
-
                     media.Add(new InstagramMedia
                     {
-                        Id = node.TryGetProperty("id", out var id) ? id.GetString() ?? "" : "",
+                        Id = node.TryGetProperty("id", out var mid) ? mid.GetString() ?? "" : "",
                         LikeCount = likes,
                         CommentsCount = comments,
-                        MediaType = mediaType
+                        MediaType = node.TryGetProperty("__typename", out var mt) ? mt.GetString() ?? "" : ""
                     });
                 }
 
@@ -146,34 +145,44 @@ namespace BackendAPI.Services
             try
             {
                 var clean = username.TrimStart('@').ToLower();
-                // Correct endpoint: /v1/similar_users?username=handle
-                var url = $"{BaseUrl}/v1/similar_users?username={clean}";
+                var client = CreateClient();
+                var response = await client.GetAsync($"{BaseUrl}/v1/similar_users?username={clean}");
 
-                var response = await _httpClient.GetAsync(url);
                 if (!response.IsSuccessStatusCode) return new();
 
                 var json = await response.Content.ReadAsStringAsync();
-                using var doc = JsonDocument.Parse(json);
+                _logger.LogDebug("Similar users for @{Username}: {Json}", clean, json[..Math.Min(500, json.Length)]);
 
+                using var doc = JsonDocument.Parse(json);
                 var usernames = new List<string>();
 
-                // Try data array directly
+                // Try multiple response shapes
+                JsonElement arr = default;
                 if (doc.RootElement.TryGetProperty("data", out var data))
                 {
-                    if (data.ValueKind == JsonValueKind.Array)
+                    if (data.ValueKind == JsonValueKind.Array) arr = data;
+                    else if (data.TryGetProperty("users", out var u)) arr = u;
+                    else if (data.TryGetProperty("edges", out var e)) arr = e;
+                }
+                else if (doc.RootElement.ValueKind == JsonValueKind.Array) arr = doc.RootElement;
+
+                if (arr.ValueKind == JsonValueKind.Array)
+                {
+                    foreach (var item in arr.EnumerateArray().Take(20))
                     {
-                        foreach (var item in data.EnumerateArray().Take(20))
-                        {
-                            if (item.TryGetProperty("username", out var u))
-                            {
-                                var uname = u.GetString();
-                                if (!string.IsNullOrEmpty(uname))
-                                    usernames.Add(uname);
-                            }
-                        }
+                        // Try direct username field or node.username
+                        string? uname = null;
+                        if (item.TryGetProperty("username", out var u1)) uname = u1.GetString();
+                        else if (item.TryGetProperty("node", out var node)
+                                 && node.TryGetProperty("username", out var u2)) uname = u2.GetString();
+                        else if (item.TryGetProperty("user", out var user)
+                                 && user.TryGetProperty("username", out var u3)) uname = u3.GetString();
+
+                        if (!string.IsNullOrEmpty(uname)) usernames.Add(uname);
                     }
                 }
 
+                _logger.LogInformation("Similar users for @{Username}: {Count} found", clean, usernames.Count);
                 return usernames;
             }
             catch (Exception ex)
@@ -188,37 +197,39 @@ namespace BackendAPI.Services
             try
             {
                 var clean = username.TrimStart('@').ToLower();
-                var url = $"{BaseUrl}/v2/user_posts?username_or_id={clean}";
+                var client = CreateClient();
+                var response = await client.GetAsync($"{BaseUrl}/v2/user_posts?username_or_id={clean}");
 
-                var response = await _httpClient.GetAsync(url);
                 if (!response.IsSuccessStatusCode) return new();
 
                 var json = await response.Content.ReadAsStringAsync();
                 using var doc = JsonDocument.Parse(json);
 
-                if (!doc.RootElement.TryGetProperty("data", out var data))
-                    return new();
-
-                if (!data.TryGetProperty("edges", out var edges))
-                    return new();
-
                 var tagged = new HashSet<string>();
+                JsonElement edges = default;
 
-                foreach (var edge in edges.EnumerateArray().Take(10))
+                if (doc.RootElement.TryGetProperty("data", out var data))
                 {
-                    if (!edge.TryGetProperty("node", out var node)) continue;
-                    if (!node.TryGetProperty("edge_media_to_tagged_user", out var taggedUsers)) continue;
-                    if (!taggedUsers.TryGetProperty("edges", out var tagEdges)) continue;
+                    if (data.TryGetProperty("edges", out var e1)) edges = e1;
+                    else if (data.TryGetProperty("edge_owner_to_timeline_media", out var eotm)
+                             && eotm.TryGetProperty("edges", out var e2)) edges = e2;
+                }
 
-                    foreach (var tagEdge in tagEdges.EnumerateArray())
+                if (edges.ValueKind == JsonValueKind.Array)
+                {
+                    foreach (var edge in edges.EnumerateArray().Take(10))
                     {
-                        if (!tagEdge.TryGetProperty("node", out var tagNode)) continue;
-                        if (!tagNode.TryGetProperty("user", out var user)) continue;
-                        if (!user.TryGetProperty("username", out var uname)) continue;
+                        var node = edge.TryGetProperty("node", out var n) ? n : edge;
+                        if (!node.TryGetProperty("edge_media_to_tagged_user", out var taggedUsers)) continue;
+                        if (!taggedUsers.TryGetProperty("edges", out var tagEdges)) continue;
 
-                        var u = uname.GetString();
-                        if (!string.IsNullOrEmpty(u))
-                            tagged.Add(u);
+                        foreach (var tagEdge in tagEdges.EnumerateArray())
+                        {
+                            var tagNode = tagEdge.TryGetProperty("node", out var tn) ? tn : tagEdge;
+                            var user = tagNode.TryGetProperty("user", out var tu) ? tu : tagNode;
+                            if (user.TryGetProperty("username", out var u) && u.GetString() is string uname)
+                                tagged.Add(uname);
+                        }
                     }
                 }
 
@@ -231,14 +242,7 @@ namespace BackendAPI.Services
             }
         }
 
-        public async Task<MediaInsights?> GetMediaInsightsAsync(string mediaId)
-        {
-            return null;
-        }
-
-        public async Task<AccountInsights?> GetAccountInsightsAsync(string userId)
-        {
-            return null;
-        }
+        public Task<MediaInsights?> GetMediaInsightsAsync(string mediaId) => Task.FromResult<MediaInsights?>(null);
+        public Task<AccountInsights?> GetAccountInsightsAsync(string userId) => Task.FromResult<AccountInsights?>(null);
     }
 }
