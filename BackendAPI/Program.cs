@@ -34,7 +34,7 @@ builder.Services.AddHttpClient();
 builder.Services.AddScoped<MessageService>();
 builder.Services.AddScoped<ApiKeyService>();
 builder.Services.AddScoped<IMatchingService, MatchingService>();
-builder.Services.AddScoped<IAIReasoningService, ClaudeReasoningService>();
+builder.Services.AddScoped<IAIReasoningService, TemplateReasoningService>();
 builder.Services.AddSingleton<BotScoreCalculator>();
 builder.Services.AddScoped<IInfluencerRefreshService, InfluencerRefreshService>();
 builder.Services.AddScoped<IInfluencerDiscoveryService, InfluencerDiscoveryService>();
