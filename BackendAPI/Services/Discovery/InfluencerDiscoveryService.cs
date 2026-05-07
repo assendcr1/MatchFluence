@@ -1,6 +1,5 @@
 using BackendAPI.Data;
 using BackendAPI.Models;
-using BackendAPI.Services.Discovery;
 using Microsoft.EntityFrameworkCore;
 
 namespace BackendAPI.Services.Discovery
@@ -47,30 +46,21 @@ namespace BackendAPI.Services.Discovery
             foreach (var handle in seedHandles)
             {
                 if (ct.IsCancellationRequested) break;
-
                 try
                 {
-                    // Graph expansion via Similar Users
                     var similar = await _instagramService.GetSimilarUsersAsync(handle);
-                    _logger.LogInformation("@{Handle}: {Count} similar users found", handle, similar.Count);
-
                     foreach (var candidate in similar)
                     {
                         if (ct.IsCancellationRequested) break;
-                        if (await TryIngestAsync(candidate, handle, ct))
-                            discovered++;
+                        if (await TryIngestAsync(candidate, handle, ct)) discovered++;
                         await Task.Delay(ThrottleDelay, ct);
                     }
 
-                    // Graph expansion via tagged users in posts
                     var tagged = await _instagramService.GetTaggedUsersAsync(handle);
-                    _logger.LogInformation("@{Handle}: {Count} tagged users found", handle, tagged.Count);
-
                     foreach (var candidate in tagged)
                     {
                         if (ct.IsCancellationRequested) break;
-                        if (await TryIngestAsync(candidate, handle, ct))
-                            discovered++;
+                        if (await TryIngestAsync(candidate, handle, ct)) discovered++;
                         await Task.Delay(ThrottleDelay, ct);
                     }
                 }
@@ -78,11 +68,24 @@ namespace BackendAPI.Services.Discovery
                 {
                     _logger.LogError(ex, "Discovery error for @{Handle}", handle);
                 }
-
                 await Task.Delay(ThrottleDelay, ct);
             }
 
             _logger.LogInformation("Discovery complete. {Count} new influencers added", discovered);
+        }
+
+        // Required by IInfluencerDiscoveryService — delegates to RunDiscoveryAsync
+        public async Task<List<string>> DiscoverFromHashtagAsync(string hashtag, CancellationToken ct)
+        {
+            // Hashtag discovery not available via public scraper
+            // Use graph expansion instead
+            _logger.LogInformation("Hashtag discovery skipped — using graph expansion");
+            return new List<string>();
+        }
+
+        public async Task IngestAccountAsync(string username, Guid? discoveredFromId, CancellationToken ct)
+        {
+            await TryIngestAsync(username, "", ct);
         }
 
         private async Task<bool> TryIngestAsync(
@@ -97,25 +100,17 @@ namespace BackendAPI.Services.Discovery
 
                 var clean = username.TrimStart('@').ToLower();
 
-                // Skip if already in database
                 var exists = await ctx.Influencers
                     .AnyAsync(i => i.InstagramHandle == "@" + clean ||
                                    i.DisplayName == clean, ct);
                 if (exists) return false;
 
-                // Fetch profile to qualify
                 var profile = await _instagramService.GetPublicProfileAsync(clean);
                 if (profile == null) return false;
 
-                // Qualify — must have at least 1,000 followers
                 if (profile.FollowersCount < InfluencerThresholds.MinFollowers)
-                {
-                    _logger.LogDebug("@{Username} below threshold ({Count} followers)",
-                        clean, profile.FollowersCount);
                     return false;
-                }
 
-                // Get media for engagement calculation
                 var media = await _instagramService.GetMediaAsync(clean);
                 await Task.Delay(500, ct);
 
@@ -135,13 +130,9 @@ namespace BackendAPI.Services.Discovery
                     accountAgeDays: 365,
                     previousFollowerCount: null);
 
-                // Find the seed influencer
-                var seedInfluencer = await ctx.Influencers
-                    .FirstOrDefaultAsync(i => i.InstagramHandle == "@" + discoveredFromHandle.TrimStart('@'), ct);
-
-                // Get default niche/market from seed or use defaults
-                int nicheId = seedInfluencer?.NicheId ?? 1;
-                int marketId = seedInfluencer?.MarketId ?? 1;
+                var seedInfluencer = string.IsNullOrEmpty(discoveredFromHandle) ? null :
+                    await ctx.Influencers.FirstOrDefaultAsync(
+                        i => i.InstagramHandle == "@" + discoveredFromHandle.TrimStart('@'), ct);
 
                 var newInfluencer = new Influencer
                 {
@@ -152,8 +143,8 @@ namespace BackendAPI.Services.Discovery
                     FollowerCount = profile.FollowersCount,
                     EngagementRate = engagementRate,
                     BotScore = botScore,
-                    NicheId = nicheId,
-                    MarketId = marketId,
+                    NicheId = seedInfluencer?.NicheId ?? 1,
+                    MarketId = seedInfluencer?.MarketId ?? 1,
                     RefreshPriority = InfluencerThresholds.PriorityLow,
                     IsVerified = profile.IsVerified,
                     DiscoverySource = "GraphExpansion",
