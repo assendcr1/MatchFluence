@@ -209,7 +209,7 @@ namespace BackendAPI.Services.Discovery
                     return null;
 
                 var media = await _instagramService.GetMediaAsync(clean);
-                await Task.Delay(500, ct);
+                await Task.Delay(500, CancellationToken.None);
 
                 decimal engagementRate = 0;
                 if (media.Any() && profile.FollowersCount > 0)
@@ -329,11 +329,11 @@ namespace BackendAPI.Services.Discovery
                         if (qualified == null) continue;
                         var id = await IngestAccountAsync(qualified, nicheId, 1, ct);
                         if (id.HasValue) discovered++;
-                        await Task.Delay(ThrottleDelay, ct);
+                        await Task.Delay(ThrottleDelay, CancellationToken.None);
                     }
                 }
                 catch (Exception ex) { _logger.LogError(ex, "Error mining @{Brand}", brandHandle); }
-                await Task.Delay(ThrottleDelay, ct);
+                await Task.Delay(ThrottleDelay, CancellationToken.None);
             }
 
             // ── Step 2: Expand from ALL existing influencers ──────────────
@@ -362,7 +362,7 @@ namespace BackendAPI.Services.Discovery
                         if (PermanentBlocklist.Contains(taggedHandle.ToLower())) continue;
 
                         var profile = await _instagramService.GetPublicProfileAsync(taggedHandle);
-                        if (profile == null) { await Task.Delay(500, ct); continue; }
+                        if (profile == null) { await Task.Delay(500, CancellationToken.None); continue; }
 
                         if (profile.IsBusinessAccount && profile.FollowersCount > 10000)
                         {
@@ -378,7 +378,7 @@ namespace BackendAPI.Services.Discovery
                                 if (qualified == null) continue;
                                 var id = await IngestAccountAsync(qualified, influencer.NicheId, influencer.MarketId, ct);
                                 if (id.HasValue) discovered++;
-                                await Task.Delay(ThrottleDelay, ct);
+                                await Task.Delay(ThrottleDelay, CancellationToken.None);
                             }
                         }
                         else
@@ -392,11 +392,11 @@ namespace BackendAPI.Services.Discovery
                                 if (id.HasValue) discovered++;
                             }
                         }
-                        await Task.Delay(ThrottleDelay, ct);
+                        await Task.Delay(ThrottleDelay, CancellationToken.None);
                     }
                 }
                 catch (Exception ex) { _logger.LogError(ex, "Expansion error for @{Handle}", handle); }
-                await Task.Delay(ThrottleDelay, ct);
+                await Task.Delay(ThrottleDelay, CancellationToken.None);
             }
 
             _logger.LogInformation("Discovery complete. {Count} new influencers added", discovered);
