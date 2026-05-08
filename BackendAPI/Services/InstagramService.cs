@@ -67,6 +67,7 @@ namespace BackendAPI.Services
                 var isVerified = data.TryGetProperty("is_verified", out var iv) && iv.GetBoolean();
                 var isBusinessAccount = data.TryGetProperty("is_business_account", out var iba) && iba.GetBoolean();
                 var categoryName = data.TryGetProperty("category_name", out var cn) ? cn.GetString() : null;
+                var biography = data.TryGetProperty("biography", out var bio) ? bio.GetString() : null;
 
                 _logger.LogInformation("✓ @{Username} — {Followers} followers", clean, followers);
 
@@ -80,7 +81,8 @@ namespace BackendAPI.Services
                     MediaCount = posts,
                     IsVerified = isVerified,
                     IsBusinessAccount = isBusinessAccount,
-                    CategoryName = categoryName
+                    CategoryName = categoryName,
+                    Biography = biography
                 };
             }
             catch (Exception ex)

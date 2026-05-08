@@ -142,7 +142,7 @@ namespace BackendAPI.Services.Discovery
                 var bio = profile.Biography.ToLower();
                 foreach (var kvp in LocationToMarket)
                 {
-                    if (bio.Contains(kvp.Key.ToLower()))
+                    if (bio.Contains(kvp.Key.ToLower(), StringComparison.OrdinalIgnoreCase))
                     {
                         result.MarketId = kvp.Value;
                         result.Confidence = "High";
@@ -172,7 +172,7 @@ namespace BackendAPI.Services.Discovery
                 var bio = profile.Biography.ToLower();
                 foreach (var kvp in BiographyNicheKeywords)
                 {
-                    if (bio.Contains(kvp.Key.ToLower()))
+                    if (bio.Contains(kvp.Key.ToLower(), StringComparison.OrdinalIgnoreCase))
                     {
                         result.NicheId = kvp.Value;
                         result.Confidence = result.Confidence == "High" ? "High" : "Medium";

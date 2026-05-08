@@ -22,5 +22,6 @@ namespace BackendAPI.Models
         public bool IsVerified { get; set; }
         public bool IsBusinessAccount { get; set; }
         public string? CategoryName { get; set; }
+        public string? Biography { get; set; }
     }
 }
