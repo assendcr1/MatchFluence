@@ -33,8 +33,7 @@ namespace BackendAPI.Controllers
                 // Fire and forget — don't make the caller wait for all influencers
                 // to refresh before getting a response
                 _ = Task.Run(
-                    () => _refreshService.RefreshAllAsync(cancellationToken),
-                    cancellationToken);
+                    () => _refreshService.RefreshAllAsync(CancellationToken.None));
 
                 return Ok(new
                 {
