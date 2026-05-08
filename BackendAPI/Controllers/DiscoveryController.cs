@@ -21,8 +21,12 @@ namespace BackendAPI.Controllers
         [HttpPost("run")]
         public async Task<IActionResult> RunDiscovery(CancellationToken ct)
         {
+            var enabled = Environment.GetEnvironmentVariable("DiscoverySettings__Enabled") != "false";
+            if (!enabled)
+                return Ok(new { message = "Discovery is currently disabled." });
+
             _logger.LogInformation("Manual discovery cycle triggered via API");
-            _ = Task.Run(() => _discoveryService.RunDiscoveryCycleAsync(ct), ct);
+            _ = Task.Run(() => _discoveryService.RunDiscoveryCycleAsync(CancellationToken.None));
             return Ok(new { message = "Discovery cycle started." });
         }
     }
