@@ -79,7 +79,8 @@ namespace BackendAPI.Services
                 }
 
                 // ── Discovery cycle — runs every 72hrs ────────────────────
-                if (now - _lastDiscoveryRun >= _lowPriorityInterval)
+                var discoveryEnabled = Environment.GetEnvironmentVariable("DiscoverySettings__Enabled") != "false";
+                if (discoveryEnabled && now - _lastDiscoveryRun >= _lowPriorityInterval)
                 {
                     try
                     {
