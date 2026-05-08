@@ -208,6 +208,7 @@ namespace BackendAPI.Services
             influencer.FollowerCount = profile.FollowersCount;
             influencer.EngagementRate = avgEngagement > 0 ? avgEngagement : influencer.EngagementRate;
             influencer.BotScore = botScore;
+            influencer.IsBusinessAccount = profile.IsBusinessAccount;
             influencer.LastDataRefresh = DateTime.UtcNow;
             influencer.NextRefreshDue = GetNextRefreshTime(influencer.RefreshPriority);
 

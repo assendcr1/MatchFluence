@@ -53,6 +53,7 @@ namespace BackendAPI.Models
         public Guid? DiscoveredFromInfluencerId { get; set; }
 
         public bool IsVerified { get; set; } = false;
+        public bool IsBusinessAccount { get; set; } = false;
 
         // Next scheduled refresh — set based on priority tier
         public DateTime NextRefreshDue { get; set; } = DateTime.UtcNow;

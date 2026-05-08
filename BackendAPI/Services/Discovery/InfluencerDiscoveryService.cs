@@ -281,6 +281,7 @@ namespace BackendAPI.Services.Discovery
                     MarketId = marketId,
                     RefreshPriority = InfluencerThresholds.PriorityLow,
                     IsVerified = false,
+                    IsBusinessAccount = false,
                     DiscoverySource = account.DiscoverySource ?? "GraphExpansion",
                     DiscoveredFromInfluencerId = account.DiscoveredFromInfluencerId,
                     LastDataRefresh = DateTime.UtcNow,

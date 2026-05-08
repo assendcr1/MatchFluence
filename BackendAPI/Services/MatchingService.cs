@@ -34,6 +34,9 @@ namespace BackendAPI.Services
                 .Include(i => i.Market)
                 .AsQueryable();
 
+            // Exclude business accounts — brands, companies, orgs not influencers
+            query = query.Where(i => !i.IsBusinessAccount);
+
             // Follower range — must be within band
             query = query.Where(i =>
                 i.FollowerCount >= request.MinimumFollowers &&
