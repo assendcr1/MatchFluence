@@ -65,6 +65,8 @@ namespace BackendAPI.Services
                 var uname = data.TryGetProperty("username", out var u) ? u.GetString() ?? clean : clean;
                 var fullName = data.TryGetProperty("full_name", out var fn) ? fn.GetString() ?? "" : "";
                 var isVerified = data.TryGetProperty("is_verified", out var iv) && iv.GetBoolean();
+                var isBusinessAccount = data.TryGetProperty("is_business_account", out var iba) && iba.GetBoolean();
+                var categoryName = data.TryGetProperty("category_name", out var cn) ? cn.GetString() : null;
 
                 _logger.LogInformation("✓ @{Username} — {Followers} followers", clean, followers);
 
@@ -76,7 +78,9 @@ namespace BackendAPI.Services
                     FollowersCount = followers,
                     FollowsCount = following,
                     MediaCount = posts,
-                    IsVerified = isVerified
+                    IsVerified = isVerified,
+                    IsBusinessAccount = isBusinessAccount,
+                    CategoryName = categoryName
                 };
             }
             catch (Exception ex)
