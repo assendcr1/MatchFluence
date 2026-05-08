@@ -211,12 +211,9 @@ namespace BackendAPI.Services
             influencer.FollowerCount = profile.FollowersCount;
             influencer.EngagementRate = avgEngagement > 0 ? avgEngagement : influencer.EngagementRate;
             influencer.BotScore = botScore;
-            influencer.IsBusinessAccount = profile.IsBusinessAccount;
-
-            // Re-classify niche and market from latest profile data
-            // Only update if confidence is Medium or High — don't overwrite manual assignments
-            // with low confidence guesses
+            // Classify — detects brand, niche, market from latest profile data
             var classification = _classifier.Classify(profile, influencer.NicheId, influencer.MarketId);
+            influencer.IsBusinessAccount = classification.IsBrand;
             if (!classification.IsBrand && classification.Confidence != "Low")
             {
                 if (influencer.DiscoverySource == "GraphExpansion")

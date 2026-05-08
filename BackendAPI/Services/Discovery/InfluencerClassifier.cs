@@ -93,6 +93,19 @@ namespace BackendAPI.Services.Discovery
             "clothing brand", "cosmetics brand", "beauty brand",
         };
 
+        // These categories confirm it's a real person/influencer even if is_business_account=true
+        private static readonly HashSet<string> InfluencerSafeCategories = new(StringComparer.OrdinalIgnoreCase)
+        {
+            "digital creator", "content creator", "public figure", "artist",
+            "musician", "actor", "actress", "model", "comedian", "blogger",
+            "personal blog", "fitness trainer", "chef", "photographer",
+            "writer", "journalist", "entrepreneur", "motivational speaker",
+            "beauty expert", "fashion designer", "makeup artist", "dj",
+            "tv personality", "radio personality", "producer", "dancer",
+            "athlete", "sports personality", "influencer", "youtuber",
+            "gamer", "streamer", "health coach", "life coach",
+        };
+
         public ClassificationResult Classify(InstagramProfile profile, int fallbackNicheId, int fallbackMarketId)
         {
             var result = new ClassificationResult
