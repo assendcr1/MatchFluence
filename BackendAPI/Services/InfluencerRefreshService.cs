@@ -10,6 +10,7 @@ namespace BackendAPI.Services
         private readonly IServiceScopeFactory _scopeFactory;
         private readonly IInstagramService _instagramService;
         private readonly BotScoreCalculator _botScoreCalculator;
+        private readonly InfluencerClassifier _classifier;
         private readonly ILogger<InfluencerRefreshService> _logger;
 
         private static readonly TimeSpan ThrottleDelay = TimeSpan.FromMilliseconds(500);
@@ -18,11 +19,13 @@ namespace BackendAPI.Services
             IServiceScopeFactory scopeFactory,
             IInstagramService instagramService,
             BotScoreCalculator botScoreCalculator,
+            InfluencerClassifier classifier,
             ILogger<InfluencerRefreshService> logger)
         {
             _scopeFactory = scopeFactory;
             _instagramService = instagramService;
             _botScoreCalculator = botScoreCalculator;
+            _classifier = classifier;
             _logger = logger;
         }
 
@@ -209,6 +212,26 @@ namespace BackendAPI.Services
             influencer.EngagementRate = avgEngagement > 0 ? avgEngagement : influencer.EngagementRate;
             influencer.BotScore = botScore;
             influencer.IsBusinessAccount = profile.IsBusinessAccount;
+
+            // Re-classify niche and market from latest profile data
+            // Only update if confidence is Medium or High — don't overwrite manual assignments
+            // with low confidence guesses
+            var classification = _classifier.Classify(profile, influencer.NicheId, influencer.MarketId);
+            if (!classification.IsBrand && classification.Confidence != "Low")
+            {
+                if (influencer.DiscoverySource == "GraphExpansion")
+                {
+                    // Always update discovered influencers
+                    influencer.NicheId = classification.NicheId;
+                    influencer.MarketId = classification.MarketId;
+                }
+                else if (influencer.DiscoverySource == "Manual" && classification.Confidence == "High")
+                {
+                    // Only update manual seeds if we're very confident
+                    influencer.MarketId = classification.MarketId;
+                }
+            }
+
             influencer.LastDataRefresh = DateTime.UtcNow;
             influencer.NextRefreshDue = GetNextRefreshTime(influencer.RefreshPriority);
 
