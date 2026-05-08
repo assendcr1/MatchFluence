@@ -111,15 +111,19 @@ namespace BackendAPI.Services.Discovery
             "event", "festival", "conference", "award",
         };
 
+        private readonly InfluencerClassifier _classifier;
+
         public InfluencerDiscoveryService(
             IServiceScopeFactory scopeFactory,
             IInstagramService instagramService,
             BotScoreCalculator botScoreCalculator,
+            InfluencerClassifier classifier,
             ILogger<InfluencerDiscoveryService> logger)
         {
             _scopeFactory = scopeFactory;
             _instagramService = instagramService;
             _botScoreCalculator = botScoreCalculator;
+            _classifier = classifier;
             _logger = logger;
         }
 
@@ -197,11 +201,13 @@ namespace BackendAPI.Services.Discovery
                 var profile = await _instagramService.GetPublicProfileAsync(clean);
                 if (profile == null) return null;
 
-                // Reject brands
-                if (IsBrandAccount(profile))
+                // Run classification — detects brand, niche, market
+                var classification = _classifier.Classify(profile, 7, 10);
+
+                if (classification.IsBrand)
                 {
-                    _logger.LogInformation("Skipping brand @{Handle} (category: {Category})",
-                        clean, profile.CategoryName);
+                    _logger.LogInformation("Skipping brand @{Handle} — {Reason}",
+                        clean, classification.BrandReason);
                     return null;
                 }
 
@@ -219,6 +225,10 @@ namespace BackendAPI.Services.Discovery
                         (decimal)totalEng / Math.Min(media.Count, 10) / profile.FollowersCount * 100, 2);
                 }
 
+                _logger.LogInformation(
+                    "Qualified @{Handle} — Niche:{Niche} Market:{Market} Confidence:{Conf}",
+                    clean, classification.NicheId, classification.MarketId, classification.Confidence);
+
                 return new DiscoveredAccount
                 {
                     Handle = clean,
@@ -228,8 +238,7 @@ namespace BackendAPI.Services.Discovery
                     EngagementRate = engagementRate,
                     PostCount = profile.MediaCount,
                     DiscoverySource = "GraphExpansion",
-                    // Store category for niche detection
-                    DiscoveryContext = profile.CategoryName
+                    DiscoveryContext = $"{classification.NicheId}:{classification.MarketId}"
                 };
             }
             catch (Exception ex)
@@ -257,8 +266,19 @@ namespace BackendAPI.Services.Discovery
                                    i.DisplayName == clean, ct);
                 if (exists) return null;
 
-                // Detect niche from category_name, fall back to brand niche
-                var detectedNiche = DetectNiche(account.DiscoveryContext, nicheId);
+                // Parse niche and market from DiscoveryContext (set by classifier)
+                // Format: "nicheId:marketId"
+                var detectedNiche = nicheId;
+                var detectedMarket = marketId;
+                if (!string.IsNullOrEmpty(account.DiscoveryContext) && account.DiscoveryContext.Contains(':'))
+                {
+                    var parts = account.DiscoveryContext.Split(':');
+                    if (parts.Length == 2)
+                    {
+                        if (int.TryParse(parts[0], out var n)) detectedNiche = n;
+                        if (int.TryParse(parts[1], out var m)) detectedMarket = m;
+                    }
+                }
 
                 var botScore = _botScoreCalculator.Calculate(
                     followerCount: account.FollowerCount,
@@ -278,7 +298,7 @@ namespace BackendAPI.Services.Discovery
                     EngagementRate = account.EngagementRate,
                     BotScore = botScore,
                     NicheId = detectedNiche,
-                    MarketId = marketId,
+                    MarketId = detectedMarket,
                     RefreshPriority = InfluencerThresholds.PriorityLow,
                     IsVerified = false,
                     IsBusinessAccount = false,
@@ -292,8 +312,8 @@ namespace BackendAPI.Services.Discovery
                 ctx.Influencers.Add(influencer);
                 await ctx.SaveChangesAsync(CancellationToken.None);
 
-                _logger.LogInformation("✓ @{Handle} | {Followers} followers | Niche: {Niche} | Category: {Category}",
-                    clean, account.FollowerCount, detectedNiche, account.DiscoveryContext);
+                _logger.LogInformation("✓ @{Handle} | {Followers} followers | Niche: {Niche} | Market: {Market}",
+                    clean, account.FollowerCount, detectedNiche, detectedMarket);
 
                 return influencer.Id;
             }

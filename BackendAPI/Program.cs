@@ -38,6 +38,7 @@ builder.Services.AddScoped<IAIReasoningService, TemplateReasoningService>();
 builder.Services.AddSingleton<BotScoreCalculator>();
 builder.Services.AddScoped<IInfluencerRefreshService, InfluencerRefreshService>();
 builder.Services.AddScoped<IInfluencerDiscoveryService, InfluencerDiscoveryService>();
+builder.Services.AddScoped<InfluencerClassifier>();
 builder.Services.AddHostedService<DataRefreshBackgroundService>();
 
 var app = builder.Build();
