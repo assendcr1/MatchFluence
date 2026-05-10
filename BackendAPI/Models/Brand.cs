@@ -29,6 +29,8 @@ namespace BackendAPI.Models
         // Stored as SHA256 hash — never store the raw key
         [Required]
         public string ApiKeyHash { get; set; }
+        // BCrypt password hash for web login
+        public string? PasswordHash { get; set; }
 
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 

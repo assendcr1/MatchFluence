@@ -17,7 +17,7 @@ export default function AgencyIntelligence() {
   const set = (k,v) => setForm(p=>({...p,[k]:v}))
   const handleMatch = async () => {
     setLoading(true)
-    try { const res = await api.runMatch(session.apiKey,form); setResults(res.data); setSelected(res.data.matches?.[0]||null) }
+    try { const res = await api.runMatch(session.token,form); setResults(res.data); setSelected(res.data.matches?.[0]||null) }
     catch(err){ alert(err.response?.data||'Match failed.') }
     finally { setLoading(false) }
   }

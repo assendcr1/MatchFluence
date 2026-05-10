@@ -10,7 +10,7 @@ export default function BrandCampaigns() {
   const [campaigns, setCampaigns] = useState([])
   const [loading, setLoading] = useState(true)
   const navigate = useNavigate()
-  useEffect(()=>{ api.getBrandCampaigns(session.apiKey).then(r=>setCampaigns(r.data||[])).catch(()=>{}).finally(()=>setLoading(false)) },[])
+  useEffect(()=>{ api.getBrandCampaigns(session.token).then(r=>setCampaigns(r.data||[])).catch(()=>{}).finally(()=>setLoading(false)) },[])
   if(loading)return <Loader />
   return (
     <div className="p-7 page-fade">

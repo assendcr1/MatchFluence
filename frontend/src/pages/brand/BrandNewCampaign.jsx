@@ -36,7 +36,7 @@ export default function BrandNewCampaign() {
     setLoading(true)
     setSaved(false)
     try {
-      const res = await api.runMatch(session.apiKey, form)
+      const res = await api.runMatch(session.token, form)
       setResults(res.data)
       setStep(2)
     }
@@ -47,7 +47,7 @@ export default function BrandNewCampaign() {
   const handleSave = async () => {
     setSaving(true)
     try {
-      await api.saveCampaign(session.apiKey, {
+      await api.saveCampaign(session.token, {
         ...form,
         matchedInfluencerIds: results.matches?.map(m => m.influencerId) || []
       })

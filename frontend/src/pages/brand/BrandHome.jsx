@@ -8,7 +8,7 @@ export default function BrandHome() {
   const { session } = useAuth()
   const [campaigns, setCampaigns] = useState([])
   const navigate = useNavigate()
-  useEffect(()=>{ api.getBrandCampaigns(session.apiKey).then(r=>setCampaigns(r.data||[])).catch(()=>{}) },[])
+  useEffect(()=>{ api.getBrandCampaigns(session.token).then(r=>setCampaigns(r.data||[])).catch(()=>{}) },[])
   const active = campaigns.filter(c=>new Date(c.endDate)>=new Date()).length
   return (
     <div className="p-7 page-fade">

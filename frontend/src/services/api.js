@@ -2,6 +2,7 @@ import axios from 'axios'
 
 const BASE = '/api'
 const auth = (key) => ({ headers: { 'X-Api-Key': key } })
+const bearer = (token) => ({ headers: { 'Authorization': `Bearer ${token}` } })
 
 export const api = {
   // Registration
@@ -47,8 +48,16 @@ export const api = {
   getAgencyCampaigns: (key) => axios.get(`${BASE}/agency/campaigns`, auth(key)),
 
   // Match
-  runMatch: (key, d) => axios.post(`${BASE}/match`, d, auth(key)),
-  saveCampaign: (key, d) => axios.post(`${BASE}/campaigns`, d, auth(key)),
+  // Auth endpoints
+  brandLogin: (email, password) => axios.post(`${BASE}/auth/brand/login`, { email, password }),
+  brandRegister: (d) => axios.post(`${BASE}/auth/brand/register`, d),
+  agencyLogin: (email, password) => axios.post(`${BASE}/auth/agency/login`, { email, password }),
+  agencyRegister: (d) => axios.post(`${BASE}/auth/agency/register`, d),
+  influencerLogin: (email, password) => axios.post(`${BASE}/auth/influencer/login`, { email, password }),
+  influencerRegister: (d) => axios.post(`${BASE}/auth/influencer/register`, d),
+
+  runMatch: (token, d) => axios.post(`${BASE}/match`, d, bearer(token)),
+  saveCampaign: (key, d) => axios.post(`${BASE}/campaigns`, d, bearer(key)),
 
   // Messaging
   sendMessage: (d) => axios.post(`${BASE}/messaging/send-message`, d),

@@ -7,7 +7,7 @@ export default function AgencyReports() {
   const { session } = useAuth()
   const [campaigns, setCampaigns] = useState([])
   const [loading, setLoading] = useState(true)
-  useEffect(()=>{ api.getAgencyCampaigns(session.apiKey).then(r=>setCampaigns(r.data||[])).catch(()=>{}).finally(()=>setLoading(false)) },[])
+  useEffect(()=>{ api.getAgencyCampaigns(session.token).then(r=>setCampaigns(r.data||[])).catch(()=>{}).finally(()=>setLoading(false)) },[])
   const generate = (c) => {
     const lines = [`MATCHFLUENCE — CAMPAIGN REPORT`,`Generated: ${new Date().toLocaleDateString()}`,`Agency: ${session.name}`,``,`CAMPAIGN: ${c.title}`,`Platform: ${c.targetPlatform}`,``,'MATCHED INFLUENCERS',...(c.matchedInfluencers||[]).map((mi,i)=>`${i+1}. @${mi.influencer?.displayName||'Unknown'} — Score: ${mi.matchScore}/100\n   ${mi.matchReason||'No reasoning available.'}`)]
     const blob = new Blob([lines.join('\n')],{type:'text/plain'})

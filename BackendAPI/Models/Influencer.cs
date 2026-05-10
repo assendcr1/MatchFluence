@@ -75,6 +75,7 @@ namespace BackendAPI.Models
         [MaxLength(150)]
         public string? YouTubeHandle { get; set; }
 
+        public string? PasswordHash { get; set; }
         public string? AccessToken { get; set; }
         public DateTime? TokenExpiry { get; set; }
 
