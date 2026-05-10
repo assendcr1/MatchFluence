@@ -125,6 +125,31 @@ namespace BackendAPI.Controllers
             return Ok(campaigns);
         }
 
+        /// <summary>Admin — list all brands</summary>
+        [HttpGet("all")]
+        public async Task<IActionResult> GetAll()
+        {
+            var brands = await _context.Brands
+                .OrderByDescending(b => b.CreatedAt)
+                .Select(b => new {
+                    b.Id, b.CompanyName, b.Email,
+                    b.Industry, b.Website, b.CreatedAt
+                })
+                .ToListAsync();
+            return Ok(brands);
+        }
+
+        /// <summary>Admin — delete a brand</summary>
+        [HttpDelete("{id:guid}")]
+        public async Task<IActionResult> Delete(Guid id)
+        {
+            var brand = await _context.Brands.FindAsync(id);
+            if (brand == null) return NotFound();
+            _context.Brands.Remove(brand);
+            await _context.SaveChangesAsync();
+            return Ok(new { message = "Brand deleted." });
+        }
+
         private Guid? GetCurrentUserId()
         {
             var idClaim = User.FindFirst("UserId")?.Value;

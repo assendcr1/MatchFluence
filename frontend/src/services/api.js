@@ -48,6 +48,12 @@ export const api = {
   getAgencyCampaigns: (key) => axios.get(`${BASE}/agency/campaigns`, auth(key)),
 
   // Match
+  // Admin — brands & agencies
+  getAllBrands: () => axios.get(`${BASE}/brand/all`),
+  deleteBrand: (id) => axios.delete(`${BASE}/brand/${id}`),
+  getAllAgencies: () => axios.get(`${BASE}/agency/all`),
+  deleteAgency: (id) => axios.delete(`${BASE}/agency/${id}`),
+
   // Auth endpoints
   brandLogin: (email, password) => axios.post(`${BASE}/auth/brand/login`, { email, password }),
   brandRegister: (d) => axios.post(`${BASE}/auth/brand/register`, d),
