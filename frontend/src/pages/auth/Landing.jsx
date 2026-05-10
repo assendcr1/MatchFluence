@@ -16,7 +16,7 @@ const avatars = [
   { img: 'https://images.pexels.com/photos/2853592/pexels-photo-2853592.jpeg', name: 'Fashion', followers: '1.2M', top: '6%', right: '-8%' },
   { img: 'https://images.pexels.com/photos/6763564/pexels-photo-6763564.jpeg', name: 'Beauty', followers: '867K', bottom: '30%', left: '-12%' },
   { img: 'https://images.pexels.com/photos/8367605/pexels-photo-8367605.jpeg', name: 'Fitness', followers: '265K', bottom: '22%', right: '-10%' },
-  { img: 'https://images.pexels.com/photos/6593724/pexels-photo-6593724.jpeg', name: 'Food', followers: '128K', top: '44%', right: '-9%' },
+  { img: 'https://images.pexels.com/photos/12673789/pexels-photo-12673789.jpeg', name: 'Food', followers: '128K', top: '44%', right: '-9%' },
 ]
 
 const steps = [
