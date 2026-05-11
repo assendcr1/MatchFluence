@@ -139,7 +139,7 @@ export default function BrandInfluencerSearch() {
                 <BotBadge score={selected.botScore} />
               </div>
 
-              <ScoreBar score={Math.round((1 - selected.botScore) * 100)} color="#3ad6c2" label="Authenticity Score" />
+              <ScoreBar score={Math.round((1 - selected.botScore) * 100)} color="#3ad6c2" />
 
               {/* AI Summary */}
               <div className="mt-4 p-4 rounded-lg" style={{ background: 'rgba(96,165,250,0.05)', border: '1px solid rgba(96,165,250,0.15)' }}>
