@@ -53,7 +53,7 @@ export default function BrandNewCampaign() {
       const endDate = new Date(Date.now() + 30*24*60*60*1000)
       const fmt = (d) => d.toISOString().split('T')[0]
       await api.saveCampaign(session.token, {
-        title: `${form.campaignTitle} — ${new Date().toLocaleDateString('en-ZA')}` ,
+        title: `${form.campaignTitle} — ${Date.now()}` ,
         description: form.campaignDescription,
         targetPlatform: form.targetPlatform || 'Instagram',
         audienceAgeMin: parseInt(form.audienceAgeMin) || 18,
