@@ -140,7 +140,7 @@ export default function Landing() {
           padding: '16px 40px'
         }}>
           <div className="max-w-7xl mx-auto flex items-center justify-between">
-            <img src="/logo.png" alt="MatFluenca" style={{ height: '88px', objectFit: 'contain', display: 'block' }} />
+            <img src="/logo.png" alt="MatFluenca" style={{ height: '120px', objectFit: 'contain', display: 'block', marginTop: '-16px', marginBottom: '-16px' }} />
             <div className="flex items-center gap-3">
               <button onClick={() => navigate('/influencer/login')} className="text-sm px-4 py-2 rounded-lg transition-colors hover:text-white" style={{ color: '#666' }}>Influencer Login</button>
               <button onClick={() => navigate('/agency/login')} className="text-sm px-4 py-2 rounded-lg transition-colors hover:text-white" style={{ color: '#666' }}>Agency Login</button>
