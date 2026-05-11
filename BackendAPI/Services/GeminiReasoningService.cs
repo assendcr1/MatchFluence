@@ -43,16 +43,25 @@ namespace BackendAPI.Services
                     $"{r.EngagementRate}% engagement | {r.BotScore:P0} bots | " +
                     $"Niche: {r.NicheName} | Market: {r.MarketName} | Score: {r.MatchScore}/100"));
 
-                var prompt = "You are an influencer marketing analyst specializing in African markets.\n\n" +
-                    "Campaign: " + request.CampaignTitle + "\n" +
+                var prompt = "You are a senior influencer marketing strategist specializing in African markets.\n\n" +
+                    "CAMPAIGN BRIEF:\n" +
+                    "Title: " + request.CampaignTitle + "\n" +
                     "Description: " + request.CampaignDescription + "\n" +
                     "Platform: " + request.TargetPlatform + "\n" +
                     "Follower Range: " + request.MinimumFollowers.ToString("N0") + " - " + request.MaximumFollowers.ToString("N0") + "\n\n" +
-                    "Top 10 Candidates:\n" + candidateList + "\n\n" +
-                    "Select the TOP 5 that would deliver the best ROI for this specific campaign. " +
-                    "Consider engagement quality, audience authenticity, niche relevance, and market fit. " +
+                    "TOP 10 CANDIDATES (ranked by algorithm score):\n" + candidateList + "\n\n" +
+                    "YOUR TASK:\n" +
+                    "Select the TOP 5 influencers that will deliver the best ROI for this specific campaign.\n" +
+                    "For each selected influencer write a UNIQUE, DATA-DRIVEN analysis (3-4 sentences) that:\n" +
+                    "1. Explains their specific fit for THIS campaign (not generic praise)\n" +
+                    "2. References their actual metrics (engagement rate, follower count, bot score)\n" +
+                    "3. Compares them to the other candidates — why are they ranked where they are?\n" +
+                    "4. Mentions any risks or concerns honestly\n" +
+                    "5. For rank #1 — make a strong specific case why they are THE best choice\n\n" +
+                    "DO NOT use generic phrases like \'strong fit\' or \'reliable choice\'.\n" +
+                    "BE SPECIFIC to each influencer\'s data and the campaign goals.\n\n" +
                     "Respond ONLY with valid JSON, no markdown:\n" +
-                    "{\"selections\":[{\"rank\":1,\"handle\":\"username\",\"reason\":\"2-3 sentence analysis why this influencer fits this campaign\"}]}";
+                    "{\"selections\":[{\"rank\":1,\"handle\":\"username\",\"reason\":\"specific data-driven analysis\"}]}";
 
                 var body = new
                 {
@@ -61,7 +70,7 @@ namespace BackendAPI.Services
                 };
 
                 var json = JsonSerializer.Serialize(body);
-                var url = $"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={_apiKey}";
+                var url = $"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={_apiKey}";
                 var response = await client.PostAsync(url, new StringContent(json, Encoding.UTF8, "application/json"));
 
                 if (!response.IsSuccessStatusCode)
@@ -158,7 +167,7 @@ namespace BackendAPI.Services
                 };
 
                 var json = JsonSerializer.Serialize(body);
-                var url = $"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={_apiKey}";
+                var url = $"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={_apiKey}";
                 var response = await client.PostAsync(url, new StringContent(json, Encoding.UTF8, "application/json"));
 
                 if (!response.IsSuccessStatusCode) 
