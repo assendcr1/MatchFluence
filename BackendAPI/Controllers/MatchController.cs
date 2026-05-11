@@ -51,10 +51,16 @@ namespace BackendAPI.Controllers
                         matches = results
                     });
 
+                var hasExpanded = results.Any(r => r.IsExpandedResult);
+                var expandedNiches = results.Where(r => r.IsExpandedResult)
+                    .Select(r => r.NicheName).Distinct().ToList();
+
                 return Ok(new
                 {
                     message = $"{results.Count} match(es) found for \"{request.CampaignTitle}\"",
                     requestedBy = new { userType, userId },
+                    expanded = hasExpanded,
+                    expandedNiches,
                     matches = results
                 });
             }

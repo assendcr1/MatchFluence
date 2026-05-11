@@ -21,6 +21,24 @@ namespace BackendAPI.Services
             _logger = logger;
         }
 
+        // Related niches — if primary niche returns too few results expand to these
+        private static readonly Dictionary<int, List<int>> RelatedNiches = new()
+        {
+            { 1, new List<int> { 7, 6 } },      // Fitness → Lifestyle, Travel
+            { 2, new List<int> { 7, 4 } },      // Fashion → Lifestyle, Beauty
+            { 3, new List<int> { 7, 2 } },      // Food → Lifestyle, Fashion
+            { 4, new List<int> { 2, 7 } },      // Beauty → Fashion, Lifestyle
+            { 5, new List<int> { 8, 7 } },      // Tech → Gaming, Lifestyle
+            { 6, new List<int> { 7, 1 } },      // Travel → Lifestyle, Fitness
+            { 7, new List<int> { 2, 13 } },     // Lifestyle → Fashion, Entertainment
+            { 8, new List<int> { 5, 7 } },      // Gaming → Tech, Lifestyle
+            { 9, new List<int> { 7, 13 } },     // Finance → Lifestyle, Entertainment
+            { 10, new List<int> { 7, 3 } },     // Parenting → Lifestyle, Food
+            { 11, new List<int> { 13, 7 } },    // Comedy → Entertainment, Lifestyle
+            { 12, new List<int> { 13, 8 } },    // Streaming → Entertainment, Gaming
+            { 13, new List<int> { 11, 7 } },    // Entertainment → Comedy, Lifestyle
+        };
+
         public async Task<List<MatchResult>> GetTopMatchesAsync(MatchRequest request)
         {
             _logger.LogInformation("Starting match for campaign: {Title}", request.CampaignTitle);
@@ -59,8 +77,31 @@ namespace BackendAPI.Services
                 query = query.Where(i => i.BotScore <= request.MaxBotScore.Value);
 
             var candidates = await query.ToListAsync();
-
             _logger.LogInformation("Hard filter returned {Count} candidates", candidates.Count);
+
+            // ── Fallback: expand to related niches if fewer than 5 candidates ──
+            var expandedNiches = new List<int>();
+            var allCandidates = candidates.ToList();
+            if (candidates.Count < 5 && request.NicheId.HasValue
+                && RelatedNiches.TryGetValue(request.NicheId.Value, out var related))
+            {
+                _logger.LogInformation("Expanding to related niches: {Niches}", string.Join(",", related));
+                var expandQuery = _context.Influencers
+                    .Include(i => i.Niche).Include(i => i.Market)
+                    .Where(i => !i.IsBusinessAccount)
+                    .Where(i => i.FollowerCount >= request.MinimumFollowers && i.FollowerCount <= request.MaximumFollowers)
+                    .Where(i => related.Contains(i.NicheId));
+
+                if (request.MarketId.HasValue)
+                    expandQuery = expandQuery.Where(i => i.MarketId == request.MarketId.Value);
+                if (request.MaxBotScore.HasValue)
+                    expandQuery = expandQuery.Where(i => i.BotScore <= request.MaxBotScore.Value);
+
+                var expanded = await expandQuery.ToListAsync();
+                expandedNiches = expanded.Select(i => i.NicheId).Distinct().ToList();
+                candidates = candidates.Concat(expanded).DistinctBy(i => i.Id).ToList();
+                _logger.LogInformation("After expansion: {Count} candidates", candidates.Count);
+            }
 
             if (!candidates.Any())
                 return new List<MatchResult>();
@@ -84,6 +125,13 @@ namespace BackendAPI.Services
             // ── Step 4: Persist matches if CampaignId provided ──────────────
             if (request.CampaignId.HasValue)
                 await PersistMatchesAsync(request.CampaignId.Value, finalResults);
+
+            // Attach expansion metadata to results
+            foreach (var result in finalResults)
+            {
+                var inf = candidates.FirstOrDefault(c => c.Id == result.InfluencerId);
+                result.IsExpandedResult = inf != null && expandedNiches.Contains(inf.NicheId);
+            }
 
             return finalResults;
         }

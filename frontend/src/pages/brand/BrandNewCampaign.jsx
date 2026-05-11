@@ -3,7 +3,7 @@ import { useAuth } from '../../context/AuthContext'
 import { api } from '../../services/api'
 import ScoreBar from '../../components/ScoreBar'
 import BotBadge from '../../components/BotBadge'
-import { ChevronRight, ChevronLeft, Search, Send, Save, Download } from 'lucide-react'
+import { ChevronRight, ChevronLeft, Search, Send, Save, Download, RefreshCw, Expand } from 'lucide-react'
 
 const STEPS = ['Brief','Audience','Results']
 
@@ -17,6 +17,7 @@ export default function BrandNewCampaign() {
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
   const [sending, setSending] = useState({})
+  const [expandedNotice, setExpandedNotice] = useState(null)
   const resultsRef = useRef(null)
   const [form, setForm] = useState({
     campaignTitle:'', campaignDescription:'', targetPlatform:'Instagram',
@@ -55,6 +56,26 @@ export default function BrandNewCampaign() {
     }
     catch(err){ alert(err.response?.data || 'Failed to save campaign.') }
     finally { setSaving(false) }
+  }
+
+  const handleRegenerate = async () => {
+    setLoading(true)
+    setSaved(false)
+    setExpandedNotice(null)
+    try {
+      const wider = {
+        ...form,
+        minimumFollowers: Math.round(form.minimumFollowers * 0.5),
+        maximumFollowers: Math.round(form.maximumFollowers * 1.5),
+        minEngagementRate: Math.max(0.5, (form.minEngagementRate || 1) * 0.5),
+        nicheId: null  // remove niche restriction
+      }
+      const res = await api.runMatch(session.token, wider)
+      setResults(res.data)
+      if (res.data.expanded) setExpandedNotice(res.data.expandedNiches)
+    }
+    catch(err){ alert(err.response?.data || 'Match failed.') }
+    finally { setLoading(false) }
   }
 
   const handleExportPDF = () => {
@@ -194,6 +215,56 @@ export default function BrandNewCampaign() {
         </div>
       )}
 
+      {/* Expansion notice popup */}
+      {expandedNotice && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center" style={{background:'rgba(0,0,0,0.7)', backdropFilter:'blur(8px)'}}>
+          <div className="card p-8 max-w-md w-full mx-4" style={{border:'1px solid rgba(251,191,36,0.3)'}}>
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{background:'rgba(251,191,36,0.1)', border:'1px solid rgba(251,191,36,0.2)'}}>
+                <span style={{fontSize:'18px'}}>⚡</span>
+              </div>
+              <div>
+                <p className="font-bold text-white" style={{fontFamily:'Syne,sans-serif'}}>Search Expanded</p>
+                <p className="text-xs mt-0.5" style={{color:'#555'}}>Not enough exact matches found</p>
+              </div>
+            </div>
+            <p className="text-sm leading-relaxed mb-6" style={{color:'#888'}}>
+              We couldn't find enough influencers in your selected niche, so we expanded the search to include closely related niches: <span style={{color:'#fbbf24', fontWeight:600}}>{expandedNotice.join(', ')}</span>. These influencers share a similar audience and content style.
+            </p>
+            <div className="flex gap-3">
+              <button onClick={() => setExpandedNotice(null)} className="btn-primary flex-1 justify-center" style={{background:'#fbbf24', color:'#0a0a0a'}}>
+                Got it, show results
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Expansion notice popup */}
+      {expandedNotice && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center" style={{background:'rgba(0,0,0,0.7)', backdropFilter:'blur(8px)'}}>
+          <div className="card p-8 max-w-md w-full mx-4" style={{border:'1px solid rgba(251,191,36,0.3)'}}>
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{background:'rgba(251,191,36,0.1)', border:'1px solid rgba(251,191,36,0.2)'}}>
+                <span style={{fontSize:'18px'}}>⚡</span>
+              </div>
+              <div>
+                <p className="font-bold text-white" style={{fontFamily:'Syne,sans-serif'}}>Search Expanded</p>
+                <p className="text-xs mt-0.5" style={{color:'#555'}}>Not enough exact matches found</p>
+              </div>
+            </div>
+            <p className="text-sm leading-relaxed mb-6" style={{color:'#888'}}>
+              We couldn't find enough influencers in your selected niche, so we expanded the search to include closely related niches: <span style={{color:'#fbbf24', fontWeight:600}}>{expandedNotice.join(', ')}</span>. These influencers share a similar audience and content style.
+            </p>
+            <div className="flex gap-3">
+              <button onClick={() => setExpandedNotice(null)} className="btn-primary flex-1 justify-center" style={{background:'#fbbf24', color:'#0a0a0a'}}>
+                Got it, show results
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {step===2&&results&&(
         <div className="max-w-2xl" ref={resultsRef}>
           <div className="flex items-center justify-between mb-5">
@@ -210,7 +281,10 @@ export default function BrandNewCampaign() {
               >
                 <Save size={13}/>{saved?'Saved!':saving?'Saving...':'Save Campaign'}
               </button>
-              <button onClick={()=>setStep(0)} className="btn-secondary text-sm"><ChevronLeft size={13}/>New Search</button>
+              <button onClick={handleRegenerate} disabled={loading} className="btn-secondary text-sm flex items-center gap-1.5">
+                <RefreshCw size={12}/>{loading ? 'Searching...' : 'Widen Search'}
+              </button>
+              <button onClick={()=>{ setStep(0); setSaved(false); setExpandedNotice(null) }} className="btn-secondary text-sm"><ChevronLeft size={13}/>New Search</button>
             </div>
           </div>
 
@@ -226,7 +300,12 @@ export default function BrandNewCampaign() {
                       <p className="text-xs mt-0.5" style={{color:'#444'}}>{m.nicheName} · {m.marketName}</p>
                     </div>
                   </div>
-                  <BotBadge score={m.botScore} />
+                  <div className="flex items-center gap-2">
+                    {m.isExpandedResult && (
+                      <span className="text-xs px-2 py-0.5 rounded-full" style={{background:'rgba(251,191,36,0.1)', color:'#fbbf24', border:'1px solid rgba(251,191,36,0.2)'}}>Related niche</span>
+                    )}
+                    <BotBadge score={m.botScore} />
+                  </div>
                 </div>
                 <div className="grid grid-cols-3 gap-3 mb-3 text-sm">
                   <div><p className="text-xs mb-0.5" style={{color:'#444'}}>Followers</p><p className="font-semibold" style={{color:'#ccc'}}>{m.followerCount?.toLocaleString()}</p></div>
