@@ -355,12 +355,7 @@ export default function Landing() {
         <footer className="px-10 py-10" style={{ borderTop: '1px solid #111' }}>
           <div className="max-w-7xl mx-auto">
             <div className="flex items-center justify-between mb-8">
-              <div className="flex items-center gap-3">
-                <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: `rgba(58,214,194,0.1)`, border: `1px solid rgba(58,214,194,0.2)` }}>
-                  <Zap size={13} style={{ color: PRIMARY }} />
-                </div>
-                <span className="font-bold text-white" style={{ fontFamily: 'Syne, sans-serif' }}>MatFluenca</span>
-              </div>
+              <img src="/logo.png" alt="MatFluenca" style={{ height: '28px', objectFit: 'contain' }} />
               <div className="flex items-center gap-8">
                 <button onClick={() => navigate('/privacy')} className="text-sm text-white transition-colors hover:text-white/60">Privacy Policy</button>
                 <button onClick={() => navigate('/terms')} className="text-sm text-white transition-colors hover:text-white/60">Terms of Service</button>
