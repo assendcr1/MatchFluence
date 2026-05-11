@@ -39,6 +39,7 @@ export default function BrandNewCampaign() {
     try {
       const res = await api.runMatch(session.token, form)
       setResults(res.data)
+      if (res.data.expanded) setExpandedNotice(res.data.expandedNiches)
       setStep(2)
     }
     catch(err){ alert(err.response?.data||'Match failed. Check your filters.') }
@@ -63,7 +64,7 @@ export default function BrandNewCampaign() {
       })
       setSaved(true)
     }
-    catch(err){ alert(err.response?.data || 'Failed to save campaign.') }
+    catch(err){ alert(err.response?.data?.message || err.response?.data || 'Failed to save campaign.') }
     finally { setSaving(false) }
   }
 
@@ -250,20 +251,7 @@ export default function BrandNewCampaign() {
       )}
 
       {/* Expansion notice popup */}
-      {expandedNotice && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center" style={{background:'rgba(0,0,0,0.7)', backdropFilter:'blur(8px)'}}>
-          <div className="card p-8 max-w-md w-full mx-4" style={{border:'1px solid rgba(251,191,36,0.3)'}}>
-            <div className="flex items-center gap-3 mb-4">
-              <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{background:'rgba(251,191,36,0.1)', border:'1px solid rgba(251,191,36,0.2)'}}>
-                <span style={{fontSize:'18px'}}>⚡</span>
-              </div>
-              <div>
-                <p className="font-bold text-white" style={{fontFamily:'Syne,sans-serif'}}>Search Expanded</p>
-                <p className="text-xs mt-0.5" style={{color:'#555'}}>Not enough exact matches found</p>
-              </div>
-            </div>
-            <p className="text-sm leading-relaxed mb-6" style={{color:'#888'}}>
-              We couldn't find enough influencers in your selected niche, so we expanded the search to include closely related niches: <span style={{color:'#fbbf24', fontWeight:600}}>{expandedNotice.join(', ')}</span>. These influencers share a similar audience and content style.
+      </span>. These influencers share a similar audience and content style.
             </p>
             <div className="flex gap-3">
               <button onClick={() => setExpandedNotice(null)} className="btn-primary flex-1 justify-center" style={{background:'#fbbf24', color:'#0a0a0a'}}>
