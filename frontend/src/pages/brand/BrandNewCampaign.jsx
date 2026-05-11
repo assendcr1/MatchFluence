@@ -252,17 +252,7 @@ export default function BrandNewCampaign() {
         </div>
       )}
 
-      {/* Expansion notice popup */}
-      </span>. These influencers share a similar audience and content style.
-            </p>
-            <div className="flex gap-3">
-              <button onClick={() => setExpandedNotice(null)} className="btn-primary flex-1 justify-center" style={{background:'#fbbf24', color:'#0a0a0a'}}>
-                Got it, show results
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+
 
       {step===2&&results&&(
         <div className="max-w-2xl" ref={resultsRef}>
