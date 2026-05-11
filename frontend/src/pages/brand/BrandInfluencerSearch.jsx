@@ -40,9 +40,10 @@ export default function BrandInfluencerSearch() {
 
       <form onSubmit={handleSearch} className="flex gap-3 mb-6 max-w-xl">
         <div className="relative flex-1">
-          <Search size={14} style={{ position: 'absolute', left: 12, top: 11, color: '#444' }} />
+          <Search size={14} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: '#444', pointerEvents: 'none' }} />
           <input
-            className="input pl-9"
+            className="input"
+            style={{ paddingLeft: '36px' }}
             placeholder="Search by name or handle..."
             value={query}
             onChange={e => setQuery(e.target.value)}
