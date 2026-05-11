@@ -184,8 +184,7 @@ namespace BackendAPI.Services
             var engLabel = engagement >= 6 ? "exceptional" : engagement >= 3 ? "strong" : engagement >= 1 ? "average" : "below-average";
             var authLabel = botScore <= 0.05m ? "highly authentic" : botScore <= 0.15m ? "mostly authentic" : "questionable authenticity";
             return $"@{handle} is a {niche} creator in {market} with {followers:N0} followers and {engLabel} engagement at {engagement}%. " +
-                   $"Their audience shows {authLabel} ({botScore:P0} estimated bots), making them {(botScore <= 0.15m ? "a reliable" : "a risky")} choice for brand partnerships. " +
-                   $"With {postCount} posts tracked, their content consistency supports {(engagement >= 3 ? "strong" : "moderate")} campaign performance.";
+                   $"Their audience shows {authLabel} ({botScore:P0} estimated bots), making them {(botScore <= 0.15m ? "a reliable" : "a risky")} choice for brand partnerships.";
         }
 
         private List<MatchResult> FallbackRank(MatchRequest request, List<MatchResult> top10)

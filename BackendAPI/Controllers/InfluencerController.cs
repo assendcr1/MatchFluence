@@ -162,7 +162,7 @@ namespace BackendAPI.Controllers
             await _context.SaveChangesAsync();
             return NoContent();
         }
-        [HttpGet("search")]
+        [HttpGet("find")]
         public async Task<IActionResult> Search([FromQuery] string q)
         {
             if (string.IsNullOrWhiteSpace(q)) return Ok(new List<object>());
@@ -199,7 +199,7 @@ namespace BackendAPI.Controllers
                 influencer.FollowerCount,
                 influencer.EngagementRate,
                 influencer.BotScore,
-                influencer.MediaCount ?? 0,
+                0,
                 influencer.Niche?.NicheName ?? "General",
                 influencer.Market?.MarketName ?? "Africa"
             );
