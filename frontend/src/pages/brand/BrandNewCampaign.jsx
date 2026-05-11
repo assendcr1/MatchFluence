@@ -49,8 +49,11 @@ export default function BrandNewCampaign() {
   const handleSave = async () => {
     setSaving(true)
     try {
+      const today = new Date()
+      const endDate = new Date(Date.now() + 30*24*60*60*1000)
+      const fmt = (d) => d.toISOString().split('T')[0]
       await api.saveCampaign(session.token, {
-        title: form.campaignTitle,
+        title: `${form.campaignTitle} — ${new Date().toLocaleDateString('en-ZA')}` ,
         description: form.campaignDescription,
         targetPlatform: form.targetPlatform || 'Instagram',
         audienceAgeMin: parseInt(form.audienceAgeMin) || 18,
@@ -59,8 +62,10 @@ export default function BrandNewCampaign() {
         contentType: form.contentType || '',
         minimumFollowers: parseInt(form.minimumFollowers) || 10000,
         maximumFollowers: parseInt(form.maximumFollowers) || 500000,
-        startDate: new Date().toISOString(),
-        endDate: new Date(Date.now() + 30*24*60*60*1000).toISOString(),
+        startDate: fmt(today),
+        endDate: fmt(endDate),
+        nicheId: form.nicheId || null,
+        marketId: form.marketId || null,
         createdByBrandId: session.userType === 'Brand' ? session.id : null,
         createdByAgencyId: session.userType === 'Agency' ? session.id : null
       })
@@ -305,9 +310,9 @@ export default function BrandNewCampaign() {
                 {m.matchReason&&<p className="text-xs mt-3 leading-relaxed" style={{color:'#666'}}>{m.matchReason}</p>}
                 {m.redFlags?.length>0&&<div className="mt-2">{m.redFlags.map((f,j)=><p key={j} className="text-xs" style={{color:'#fbbf24'}}>⚠ {f}</p>)}</div>}
                 <div className="mt-4">
-                  <button onClick={()=>handleSend(m.influencerId)} disabled={!!sending[m.influencerId]} className="btn-primary text-sm"
+                  <button onClick={()=>handleSend(m)} disabled={!!sending[m.influencerId]} className="btn-primary text-sm"
                     style={{background:sending[m.influencerId]==='sent'?'#4ade80':'#60a5fa',color:'#0a0a0a'}}>
-                    <Send size={12}/>{sending[m.influencerId]==='sent'?'Sent!':sending[m.influencerId]?'Sending...':'Send Outreach'}
+                    <Send size={12}/>{sending[m.influencerId]==='sent'?'Copied! Send via DM':sending[m.influencerId]?'Copying...':'Send Outreach'}
                   </button>
                 </div>
               </div>
