@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom'
-import { Zap, Users, Building2, Briefcase, BarChart3, Shield, Globe, ChevronRight, Star, TrendingUp, Search, ArrowRight, X } from 'lucide-react'
+import { Users, Building2, Briefcase, BarChart3, Shield, Globe, ChevronRight, Star, TrendingUp, Search, ArrowRight, X } from 'lucide-react'
 import { useState, useEffect } from 'react'
 
 const PRIMARY = '#3ad6c2'
@@ -84,10 +84,7 @@ export default function Landing() {
     <>
       {/* Mobile block */}
       <div className="md:hidden min-h-screen flex flex-col items-center justify-center text-center px-8" style={{ background: '#0a0a0a' }}>
-        <div className="w-14 h-14 rounded-2xl flex items-center justify-center mb-6" style={{ background: 'rgba(58,214,194,0.1)', border: `1px solid rgba(58,214,194,0.3)` }}>
-          <Zap size={24} style={{ color: PRIMARY }} />
-        </div>
-        <h1 className="text-2xl font-bold text-white mb-3" style={{ fontFamily: 'Syne, sans-serif' }}>MatFluenca</h1>
+        <img src="/logo.png" alt="MatFluenca" style={{ height: '60px', marginBottom: '16px' }} />
         <p className="text-sm leading-relaxed mb-2" style={{ color: '#555' }}>Please move to desktop to get the full experience.</p>
         <p className="text-xs" style={{ color: '#333' }}>MatFluenca is optimised for desktop browsers.</p>
         <p className="text-xs mt-8" style={{ color: '#222' }}>A product of The Ablant Co.</p>
@@ -143,12 +140,7 @@ export default function Landing() {
           padding: '16px 40px'
         }}>
           <div className="max-w-7xl mx-auto flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'rgba(58,214,194,0.15)', border: `1px solid rgba(58,214,194,0.3)` }}>
-                <Zap size={15} style={{ color: PRIMARY }} />
-              </div>
-              <span className="font-bold text-white text-lg" style={{ fontFamily: 'Syne, sans-serif' }}>MatFluenca</span>
-            </div>
+            <img src="/logo.png" alt="MatFluenca" style={{ height: '32px' }} />
             <div className="flex items-center gap-3">
               <button onClick={() => navigate('/influencer/login')} className="text-sm px-4 py-2 rounded-lg transition-colors hover:text-white" style={{ color: '#666' }}>Influencer Login</button>
               <button onClick={() => navigate('/agency/login')} className="text-sm px-4 py-2 rounded-lg transition-colors hover:text-white" style={{ color: '#666' }}>Agency Login</button>

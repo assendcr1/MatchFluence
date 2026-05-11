@@ -1,6 +1,6 @@
 import { NavLink, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
-import { LogOut, Zap } from 'lucide-react'
+import { LogOut } from 'lucide-react'
 
 export default function Sidebar({ links, accentColor = 'teal' }) {
   const { session, logout } = useAuth()
