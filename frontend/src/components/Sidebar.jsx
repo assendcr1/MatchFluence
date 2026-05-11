@@ -12,9 +12,8 @@ export default function Sidebar({ links, accentColor = 'teal' }) {
     <div className="w-56 min-h-screen flex flex-col flex-shrink-0" style={{ background: '#0d0d0d', borderRight: '1px solid #1a1a1a' }}>
       {/* Logo */}
       <div className="px-4 py-5 border-b border-ink-700">
-        <div className="flex items-center gap-2 mb-3">
-          <Zap size={16} style={{ color: accent }} />
-          <span className="font-bold text-white text-base" style={{ fontFamily: 'Syne, sans-serif' }}>MatFluenca</span>
+        <div className="mb-3">
+          <img src="/logo.png" alt="MatFluenca" style={{ height: '28px', maxWidth: '140px', objectFit: 'contain' }} />
         </div>
         {session && (
           <div>
