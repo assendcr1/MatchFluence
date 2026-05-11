@@ -130,6 +130,19 @@ public async Task<IActionResult> CreateCampaign([FromBody] Campaign campaign)
         return BadRequest("Campaign data is required.");
     }
 
+    // Get brand/agency from JWT
+    var userIdClaim = User.FindFirst("UserId")?.Value;
+    var userTypeClaim = User.FindFirst("UserType")?.Value;
+    Guid? brandId = null;
+    Guid? agencyId = null;
+    if (Guid.TryParse(userIdClaim, out var parsedId))
+    {
+        if (userTypeClaim == "Brand") brandId = parsedId;
+        else if (userTypeClaim == "Agency") agencyId = parsedId;
+    }
+    if (brandId == null && campaign.CreatedByBrandId.HasValue) brandId = campaign.CreatedByBrandId;
+    if (agencyId == null && campaign.CreatedByAgencyId.HasValue) agencyId = campaign.CreatedByAgencyId;
+
     var campaignEntity = new Campaign
     {
         Id = Guid.NewGuid(),
@@ -143,7 +156,11 @@ public async Task<IActionResult> CreateCampaign([FromBody] Campaign campaign)
         MinimumFollowers = campaign.MinimumFollowers,
         MaximumFollowers = campaign.MaximumFollowers,
         StartDate = campaign.StartDate,
-        EndDate = campaign.EndDate
+        EndDate = campaign.EndDate,
+        NicheId = campaign.NicheId,
+        MarketId = campaign.MarketId,
+        CreatedByBrandId = brandId,
+        CreatedByAgencyId = agencyId
     };
 
     _context.Campaigns.Add(campaignEntity);
