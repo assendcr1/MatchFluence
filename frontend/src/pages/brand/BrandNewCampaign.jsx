@@ -3,7 +3,7 @@ import { useAuth } from '../../context/AuthContext'
 import { api } from '../../services/api'
 import ScoreBar from '../../components/ScoreBar'
 import BotBadge from '../../components/BotBadge'
-import { ChevronRight, ChevronLeft, Search, Send, Save, Download, RefreshCw, Expand } from 'lucide-react'
+import { ChevronRight, ChevronLeft, Search, Send, Save, Download, RefreshCw, Expand, Heart } from 'lucide-react'
 
 const STEPS = ['Brief','Audience','Results']
 
@@ -54,6 +54,7 @@ export default function BrandNewCampaign() {
       const fmt = (d) => d.toISOString().split('T')[0]
       await api.saveCampaign(session.token, {
         title: `${form.campaignTitle} — ${Date.now()}` ,
+        _favourites: [...favourites],
         description: form.campaignDescription,
         targetPlatform: form.targetPlatform || 'Instagram',
         audienceAgeMin: parseInt(form.audienceAgeMin) || 18,
@@ -70,6 +71,14 @@ export default function BrandNewCampaign() {
         createdByAgencyId: session.userType === 'Agency' ? session.id : null
       })
       setSaved(true)
+      // Store favourites against campaign title for BrandCampaigns to read
+      if (favourites.size > 0) {
+        try {
+          const existing = JSON.parse(localStorage.getItem('mf_favourites') || '{}')
+          existing[form.campaignTitle] = [...favourites]
+          localStorage.setItem('mf_favourites', JSON.stringify(existing))
+        } catch {}
+      }
     }
     catch(err){ alert(err.response?.data?.message || err.response?.data || 'Failed to save campaign.') }
     finally { setSaving(false) }
@@ -173,6 +182,16 @@ export default function BrandNewCampaign() {
   }
 
   const [copiedId, setCopiedId] = useState(null)
+  const [favourites, setFavourites] = useState(new Set())
+
+  const toggleFavourite = (influencerId) => {
+    setFavourites(prev => {
+      const next = new Set(prev)
+      if (next.has(influencerId)) next.delete(influencerId)
+      else next.add(influencerId)
+      return next
+    })
+  }
   const [emailId, setEmailId] = useState(null)
 
   const handleSend = (m) => {
@@ -310,6 +329,10 @@ export default function BrandNewCampaign() {
                 </div>
                 <ScoreBar score={m.matchScore} color="#60a5fa" />
                 {m.matchReason&&<p className="text-xs mt-3 leading-relaxed" style={{color:'#666'}}>{m.matchReason}</p>}
+                <button onClick={()=>toggleFavourite(m.influencerId)} className="mt-2 flex items-center gap-1 text-xs transition-colors" style={{color: favourites.has(m.influencerId) ? '#f87171' : '#555'}}>
+                  <Heart size={13} fill={favourites.has(m.influencerId) ? '#f87171' : 'none'} style={{color: favourites.has(m.influencerId) ? '#f87171' : '#555'}}/>
+                  {favourites.has(m.influencerId) ? 'Favourited' : 'Add to Favourites'}
+                </button>
                 {m.redFlags?.length>0&&<div className="mt-2">{m.redFlags.map((f,j)=><p key={j} className="text-xs" style={{color:'#fbbf24'}}>⚠ {f}</p>)}</div>}
                 <div className="mt-4 space-y-2">
                   <button onClick={()=>handleSend(m)} className="btn-primary text-sm"
