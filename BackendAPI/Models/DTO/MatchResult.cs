@@ -27,6 +27,7 @@ namespace BackendAPI.Models.DTO
 
         // Any flags the brand should be aware of
         public List<string> RedFlags { get; set; } = new();
+        public bool IsExpandedResult { get; set; } = false;
     }
 
     public class ScoreBreakdown
