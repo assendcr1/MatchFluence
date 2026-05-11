@@ -180,7 +180,6 @@ export default function BrandNewCampaign() {
     const msg = `Hi @${m.displayName}! 👋\n\n${brandName} would like to invite you to collaborate on our "${form.campaignTitle}" campaign on ${form.targetPlatform || 'Instagram'}.\n\nTo accept this invitation and view full campaign details, please sign up to MatFluenca — Africa's Influencer Intelligence Platform:\nhttps://matfluenca.vercel.app/influencer/login\n\nWe look forward to working with you! 🚀\n\nPowered by MatFluenca | A Product of The Ablant Co.`
     navigator.clipboard.writeText(msg).then(() => {
       setCopiedId(m.influencerId)
-      setTimeout(() => setCopiedId(null), 4000)
     })
   }
 
@@ -318,12 +317,13 @@ export default function BrandNewCampaign() {
                     <Send size={12}/>{copiedId===m.influencerId ? 'DM Copied to Clipboard!' : 'Send Outreach'}
                   </button>
                   {copiedId===m.influencerId && (
-                    <div className="p-3 rounded-lg" style={{background:'rgba(74,222,128,0.08)', border:'1px solid rgba(74,222,128,0.2)'}}>
-                      <p className="text-xs mb-1" style={{color:'#4ade80'}}>✓ Custom DM copied to your clipboard. Paste it into Instagram.</p>
+                    <div className="p-3 rounded-lg relative" style={{background:'rgba(74,222,128,0.08)', border:'1px solid rgba(74,222,128,0.2)'}}>
+                      <button onClick={()=>setCopiedId(null)} className="absolute top-2 right-2 hover:opacity-70" style={{color:'#555', fontSize:'14px'}}>✕</button>
+                      <p className="text-xs mb-1 pr-4" style={{color:'#4ade80'}}>✓ Custom DM copied to your clipboard. Paste it into Instagram.</p>
                       {m.email && (
                         <div className="mt-2 pt-2" style={{borderTop:'1px solid rgba(74,222,128,0.15)'}}>
                           <p className="text-xs mb-1" style={{color:'#555'}}>Or reach out via email:</p>
-                          <p className="text-xs font-mono" style={{color:'#60a5fa'}}>{m.email}</p>
+                          <a href={`mailto:${m.email}`} className="text-xs font-mono hover:opacity-70" style={{color:'#60a5fa'}}>{m.email}</a>
                         </div>
                       )}
                     </div>
