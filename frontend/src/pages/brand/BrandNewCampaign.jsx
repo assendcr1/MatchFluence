@@ -52,15 +52,17 @@ export default function BrandNewCampaign() {
       await api.saveCampaign(session.token, {
         title: form.campaignTitle,
         description: form.campaignDescription,
-        targetPlatform: form.targetPlatform,
-        audienceAgeMin: form.audienceAgeMin || 0,
-        audienceAgeMax: form.audienceAgeMax || 0,
+        targetPlatform: form.targetPlatform || 'Instagram',
+        audienceAgeMin: parseInt(form.audienceAgeMin) || 18,
+        audienceAgeMax: parseInt(form.audienceAgeMax) || 35,
         audienceGender: form.audienceGender || 'Any',
         contentType: form.contentType || '',
-        minimumFollowers: form.minimumFollowers || 0,
-        maximumFollowers: form.maximumFollowers || 0,
+        minimumFollowers: parseInt(form.minimumFollowers) || 10000,
+        maximumFollowers: parseInt(form.maximumFollowers) || 500000,
         startDate: new Date().toISOString(),
-        endDate: new Date(Date.now() + 30*24*60*60*1000).toISOString()
+        endDate: new Date(Date.now() + 30*24*60*60*1000).toISOString(),
+        createdByBrandId: session.userType === 'Brand' ? session.id : null,
+        createdByAgencyId: session.userType === 'Agency' ? session.id : null
       })
       setSaved(true)
     }
