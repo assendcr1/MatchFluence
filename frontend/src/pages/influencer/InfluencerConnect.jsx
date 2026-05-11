@@ -17,7 +17,7 @@ export default function InfluencerConnect() {
             ✓ Public data is already being tracked
           </p>
           <p className="text-xs leading-relaxed" style={{ color: '#666' }}>
-            MatchFluence automatically tracks your public Instagram metrics — follower count,
+            MatFluenca automatically tracks your public Instagram metrics — follower count,
             engagement rate, and audience authenticity score — every 24 hours.
             No connection required for this data.
           </p>

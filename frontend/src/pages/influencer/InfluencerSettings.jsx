@@ -102,7 +102,7 @@ export default function InfluencerSettings() {
           Data & Privacy
         </p>
         <p className="text-xs mb-4 leading-relaxed" style={{ color: '#555' }}>
-          Under POPIA you have the right to access and delete your personal data held by MatchFluence.
+          Under POPIA you have the right to access and delete your personal data held by MatFluenca.
         </p>
         <div className="space-y-3">
           <a
@@ -124,7 +124,7 @@ export default function InfluencerSettings() {
             <span style={{ color: '#444' }}>→</span>
           </a>
           <a
-            href="mailto:privacy@ablant.co?subject=Data Deletion Request&body=Please delete all personal data associated with my MatchFluence account. My display name is: "
+            href="mailto:privacy@ablant.co?subject=Data Deletion Request&body=Please delete all personal data associated with my MatFluenca account. My display name is: "
             className="flex items-center justify-between p-3 rounded-lg text-sm"
             style={{ background: '#0d0d0d', border: '1px solid #1a1a1a', color: '#888', textDecoration: 'none' }}
           >
@@ -144,7 +144,7 @@ export default function InfluencerSettings() {
         </div>
         <p className="text-xs mb-4 leading-relaxed" style={{ color: '#555' }}>
           This permanently deletes your profile, all metric history, and campaign match records
-          from MatchFluence. This action cannot be undone and complies with your POPIA right to erasure.
+          from MatFluenca. This action cannot be undone and complies with your POPIA right to erasure.
         </p>
 
         {!showDeleteConfirm ? (

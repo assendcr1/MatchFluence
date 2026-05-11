@@ -38,7 +38,7 @@ export default function InfluencerAuth() {
   }
 
   return (
-    <AuthLayout title={mode === 'login' ? 'Influencer Sign In' : 'Join MatchFluence'} subtitle="Get discovered by Africa's top brands" accent="#3ad6c2">
+    <AuthLayout title={mode === 'login' ? 'Influencer Sign In' : 'Join MatFluenca'} subtitle="Get discovered by Africa's top brands" accent="#3ad6c2">
       {error && <div className="mb-4 p-3 rounded-lg text-sm" style={{ background: 'rgba(248,113,113,0.1)', color: '#f87171', border: '1px solid rgba(248,113,113,0.2)' }}>{error}</div>}
 
       {mode === 'login' ? (

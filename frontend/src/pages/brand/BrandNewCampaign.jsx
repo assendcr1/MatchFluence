@@ -100,7 +100,7 @@ export default function BrandNewCampaign() {
       <html>
       <head>
         <meta charset="utf-8">
-        <title>${form.campaignTitle} — MatchFluence Report</title>
+        <title>${form.campaignTitle} — MatFluenca Report</title>
         <style>
           body { font-family: Arial, sans-serif; color: #111; padding: 40px; max-width: 800px; margin: 0 auto; }
           h1 { font-size: 24px; margin-bottom: 4px; }
@@ -125,7 +125,7 @@ export default function BrandNewCampaign() {
       </head>
       <body>
         <h1>${form.campaignTitle}</h1>
-        <p class="subtitle">MatchFluence Campaign Report · Generated ${new Date().toLocaleDateString('en-ZA', {day:'numeric',month:'long',year:'numeric'})}</p>
+        <p class="subtitle">MatFluenca Campaign Report · Generated ${new Date().toLocaleDateString('en-ZA', {day:'numeric',month:'long',year:'numeric'})}</p>
         <div class="meta">
           <div class="meta-item"><label>Platform</label><span>${form.targetPlatform}</span></div>
           <div class="meta-item"><label>Niche</label><span>${niche}</span></div>
@@ -154,7 +154,7 @@ export default function BrandNewCampaign() {
           </div>
         `).join('')}
         <div class="footer">
-          <span>MatchFluence · The Ablant Co.</span>
+          <span>MatFluenca · The Ablant Co.</span>
           <span>${form.campaignTitle} · ${new Date().toLocaleDateString()}</span>
         </div>
       </body>

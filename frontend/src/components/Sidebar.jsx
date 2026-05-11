@@ -14,7 +14,7 @@ export default function Sidebar({ links, accentColor = 'teal' }) {
       <div className="px-4 py-5 border-b border-ink-700">
         <div className="flex items-center gap-2 mb-3">
           <Zap size={16} style={{ color: accent }} />
-          <span className="font-bold text-white text-base" style={{ fontFamily: 'Syne, sans-serif' }}>MatchFluence</span>
+          <span className="font-bold text-white text-base" style={{ fontFamily: 'Syne, sans-serif' }}>MatFluenca</span>
         </div>
         {session && (
           <div>

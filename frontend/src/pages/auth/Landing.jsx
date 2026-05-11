@@ -87,9 +87,9 @@ export default function Landing() {
         <div className="w-14 h-14 rounded-2xl flex items-center justify-center mb-6" style={{ background: 'rgba(58,214,194,0.1)', border: `1px solid rgba(58,214,194,0.3)` }}>
           <Zap size={24} style={{ color: PRIMARY }} />
         </div>
-        <h1 className="text-2xl font-bold text-white mb-3" style={{ fontFamily: 'Syne, sans-serif' }}>MatchFluence</h1>
+        <h1 className="text-2xl font-bold text-white mb-3" style={{ fontFamily: 'Syne, sans-serif' }}>MatFluenca</h1>
         <p className="text-sm leading-relaxed mb-2" style={{ color: '#555' }}>Please move to desktop to get the full experience.</p>
-        <p className="text-xs" style={{ color: '#333' }}>MatchFluence is optimised for desktop browsers.</p>
+        <p className="text-xs" style={{ color: '#333' }}>MatFluenca is optimised for desktop browsers.</p>
         <p className="text-xs mt-8" style={{ color: '#222' }}>A product of The Ablant Co.</p>
       </div>
 
@@ -104,7 +104,7 @@ export default function Landing() {
                 <X size={16} />
               </button>
               <h2 className="text-2xl font-bold text-white mb-2" style={{ fontFamily: 'Syne, sans-serif' }}>Get Started</h2>
-              <p className="text-sm mb-8" style={{ color: '#555' }}>How are you joining MatchFluence?</p>
+              <p className="text-sm mb-8" style={{ color: '#555' }}>How are you joining MatFluenca?</p>
               <div className="space-y-3">
                 <button onClick={() => navigate('/brand/login')} className="w-full p-5 rounded-2xl text-left flex items-center gap-4 hover:opacity-90 transition-opacity" style={{ background: 'rgba(96,165,250,0.1)', border: '1px solid rgba(96,165,250,0.2)' }}>
                   <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: 'rgba(96,165,250,0.15)', border: '1px solid rgba(96,165,250,0.3)' }}>
@@ -147,7 +147,7 @@ export default function Landing() {
               <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'rgba(58,214,194,0.15)', border: `1px solid rgba(58,214,194,0.3)` }}>
                 <Zap size={15} style={{ color: PRIMARY }} />
               </div>
-              <span className="font-bold text-white text-lg" style={{ fontFamily: 'Syne, sans-serif' }}>MatchFluence</span>
+              <span className="font-bold text-white text-lg" style={{ fontFamily: 'Syne, sans-serif' }}>MatFluenca</span>
             </div>
             <div className="flex items-center gap-3">
               <button onClick={() => navigate('/influencer/login')} className="text-sm px-4 py-2 rounded-lg transition-colors hover:text-white" style={{ color: '#666' }}>Influencer Login</button>
@@ -171,7 +171,7 @@ export default function Landing() {
                 for every campaign
               </h1>
               <p className="text-base mb-10 leading-relaxed" style={{ color: '#666', maxWidth: '420px' }}>
-                MatchFluence uses data and AI to connect brands with authentic African influencers. No more guesswork, no more wasted budgets.
+                MatFluenca uses data and AI to connect brands with authentic African influencers. No more guesswork, no more wasted budgets.
               </p>
               <div className="flex gap-3">
                 <button onClick={() => setShowStartModal(true)} className="px-7 py-3.5 rounded-xl font-semibold text-sm flex items-center gap-2 hover:opacity-90 transition-opacity" style={{ background: PRIMARY, color: '#0a0a0a' }}>
@@ -262,7 +262,7 @@ export default function Landing() {
             <div className="text-center mb-16">
               <p className="text-xs font-semibold uppercase tracking-widest mb-3" style={{ color: PRIMARY }}>Get Started</p>
               <h2 className="text-4xl font-bold mb-4" style={{ fontFamily: 'Syne, sans-serif' }}>Choose your portal</h2>
-              <p className="text-sm" style={{ color: '#555' }}>MatchFluence serves three distinct user types. Select yours to get started.</p>
+              <p className="text-sm" style={{ color: '#555' }}>MatFluenca serves three distinct user types. Select yours to get started.</p>
             </div>
             <div className="grid grid-cols-3 gap-6">
               {portals.map(({ role, icon: Icon, color, gradient, border, path, tagline, desc, bullets }) => (
@@ -367,7 +367,7 @@ export default function Landing() {
                 <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: `rgba(58,214,194,0.1)`, border: `1px solid rgba(58,214,194,0.2)` }}>
                   <Zap size={13} style={{ color: PRIMARY }} />
                 </div>
-                <span className="font-bold text-white" style={{ fontFamily: 'Syne, sans-serif' }}>MatchFluence</span>
+                <span className="font-bold text-white" style={{ fontFamily: 'Syne, sans-serif' }}>MatFluenca</span>
               </div>
               <div className="flex items-center gap-8">
                 <button onClick={() => navigate('/privacy')} className="text-sm text-white transition-colors hover:text-white/60">Privacy Policy</button>
@@ -381,7 +381,7 @@ export default function Landing() {
                 <div className="flex items-center justify-center px-3 py-1.5 rounded-lg" style={{ background: '#111', border: '1px solid #1e1e1e' }}>
                   <span className="text-xs font-bold tracking-wider" style={{ color: '#444', fontFamily: 'Syne, sans-serif' }}>THE ABLANT CO.</span>
                 </div>
-                <p className="text-xs" style={{ color: '#2a2a2a' }}>MatchFluence is a product of The Ablant Co.</p>
+                <p className="text-xs" style={{ color: '#2a2a2a' }}>MatFluenca is a product of The Ablant Co.</p>
               </div>
               <p className="text-xs" style={{ color: '#2a2a2a' }}>© {new Date().getFullYear()} The Ablant Co. · All rights reserved</p>
             </div>

@@ -4,7 +4,7 @@ import { ArrowLeft } from 'lucide-react'
 export default function PrivacyPolicy() {
   const navigate = useNavigate()
   const company = 'The Ablant Co.'
-  const product = 'MatchFluence'
+  const product = 'MatFluenca'
   const email = 'legal@ablantco.com'
   const updated = '1 May 2026'
 
@@ -101,7 +101,7 @@ export default function PrivacyPolicy() {
         </div>
 
         <div className="mt-12 pt-8 border-t" style={{ borderColor: '#1a1a1a' }}>
-          <p className="text-xs" style={{ color: '#333' }}>© {new Date().getFullYear()} {company} · MatchFluence</p>
+          <p className="text-xs" style={{ color: '#333' }}>© {new Date().getFullYear()} {company} · MatFluenca</p>
         </div>
       </div>
     </div>
