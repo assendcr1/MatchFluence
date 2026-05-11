@@ -202,7 +202,7 @@ namespace BackendAPI.Services.Discovery
                 if (profile == null) return null;
 
                 // Run classification — detects brand, niche, market
-                var classification = _classifier.Classify(profile, 7, 10);
+                var classification = _classifier.Classify(profile, 7, 10); // Default: Lifestyle niche, Global market
 
                 if (classification.IsBrand)
                 {
@@ -268,8 +268,10 @@ namespace BackendAPI.Services.Discovery
 
                 // Parse niche and market from DiscoveryContext (set by classifier)
                 // Format: "nicheId:marketId"
+                // Default market is Global (10) — only override with specific market
+                // if classifier is HIGH confidence based on biography keywords
                 var detectedNiche = nicheId;
-                var detectedMarket = marketId;
+                var detectedMarket = 10; // Global by default
                 if (!string.IsNullOrEmpty(account.DiscoveryContext) && account.DiscoveryContext.Contains(':'))
                 {
                     var parts = account.DiscoveryContext.Split(':');

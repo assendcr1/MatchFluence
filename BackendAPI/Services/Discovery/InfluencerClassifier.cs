@@ -111,7 +111,7 @@ namespace BackendAPI.Services.Discovery
             var result = new ClassificationResult
             {
                 NicheId = fallbackNicheId,
-                MarketId = fallbackMarketId,
+                MarketId = 10, // Default to Global (10) — only override if HIGH confidence
                 IsBrand = false,
                 Confidence = "Low"
             };
