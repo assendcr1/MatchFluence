@@ -210,6 +210,7 @@ namespace BackendAPI.Services
                 EngagementRate = influencer.EngagementRate,
                 BotScore = influencer.BotScore,
                 NicheName = influencer.Niche?.NicheName,
+                Email = influencer.Email,
                 MarketName = influencer.Market?.MarketName,
                 MatchScore = breakdown.Total,
                 ScoreBreakdown = breakdown,
