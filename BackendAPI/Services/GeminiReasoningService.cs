@@ -70,7 +70,7 @@ namespace BackendAPI.Services
                 };
 
                 var json = JsonSerializer.Serialize(body);
-                var url = $"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={_apiKey}";
+                var url = $"https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent?key={_apiKey}";
                 var response = await client.PostAsync(url, new StringContent(json, Encoding.UTF8, "application/json"));
 
                 if (!response.IsSuccessStatusCode)
@@ -167,7 +167,7 @@ namespace BackendAPI.Services
                 };
 
                 var json = JsonSerializer.Serialize(body);
-                var url = $"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={_apiKey}";
+                var url = $"https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent?key={_apiKey}";
                 var response = await client.PostAsync(url, new StringContent(json, Encoding.UTF8, "application/json"));
 
                 if (!response.IsSuccessStatusCode) 
