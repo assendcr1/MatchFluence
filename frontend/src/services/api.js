@@ -46,7 +46,7 @@ export const api = {
   getCampaigns: () => axios.get(`${BASE}/campaign`),
   createCampaign: (d) => axios.post(`${BASE}/campaign`, d),
   deleteCampaign: (id) => axios.delete(`${BASE}/campaign/${id}`),
-  getBrandCampaigns: (key) => axios.get(`${BASE}/brand/campaigns`, auth(key)),
+  getBrandCampaigns: (token) => axios.get(`${BASE}/brand/campaigns`, bearer(token)),
   getAgencyCampaigns: (key) => axios.get(`${BASE}/agency/campaigns`, auth(key)),
 
   // Match

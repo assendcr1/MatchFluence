@@ -172,13 +172,16 @@ export default function BrandNewCampaign() {
     setTimeout(() => { win?.print(); URL.revokeObjectURL(url) }, 800)
   }
 
-  const handleSend = async (influencerId) => {
-    setSending(p=>({...p,[influencerId]:true}))
-    try {
-      await api.sendMessage({ campaignId:'00000000-0000-0000-0000-000000000000', influencerId, messageType:'Email' })
-      setSending(p=>({...p,[influencerId]:'sent'}))
-    }
-    catch { setSending(p=>({...p,[influencerId]:'failed'})) }
+  const [copiedId, setCopiedId] = useState(null)
+  const [emailId, setEmailId] = useState(null)
+
+  const handleSend = (m) => {
+    const brandName = session.name || 'A brand'
+    const msg = `Hi @${m.displayName}! 👋\n\n${brandName} would like to invite you to collaborate on our "${form.campaignTitle}" campaign on ${form.targetPlatform || 'Instagram'}.\n\nTo accept this invitation and view full campaign details, please sign up to MatFluenca — Africa's Influencer Intelligence Platform:\nhttps://matfluenca.vercel.app/influencer/login\n\nWe look forward to working with you! 🚀\n\nPowered by MatFluenca | A Product of The Ablant Co.`
+    navigator.clipboard.writeText(msg).then(() => {
+      setCopiedId(m.influencerId)
+      setTimeout(() => setCopiedId(null), 4000)
+    })
   }
 
   return (
@@ -309,11 +312,22 @@ export default function BrandNewCampaign() {
                 <ScoreBar score={m.matchScore} color="#60a5fa" />
                 {m.matchReason&&<p className="text-xs mt-3 leading-relaxed" style={{color:'#666'}}>{m.matchReason}</p>}
                 {m.redFlags?.length>0&&<div className="mt-2">{m.redFlags.map((f,j)=><p key={j} className="text-xs" style={{color:'#fbbf24'}}>⚠ {f}</p>)}</div>}
-                <div className="mt-4">
-                  <button onClick={()=>handleSend(m)} disabled={!!sending[m.influencerId]} className="btn-primary text-sm"
-                    style={{background:sending[m.influencerId]==='sent'?'#4ade80':'#60a5fa',color:'#0a0a0a'}}>
-                    <Send size={12}/>{sending[m.influencerId]==='sent'?'Copied! Send via DM':sending[m.influencerId]?'Copying...':'Send Outreach'}
+                <div className="mt-4 space-y-2">
+                  <button onClick={()=>handleSend(m)} className="btn-primary text-sm"
+                    style={{background: copiedId===m.influencerId ? '#4ade80' : '#60a5fa', color:'#0a0a0a'}}>
+                    <Send size={12}/>{copiedId===m.influencerId ? 'DM Copied to Clipboard!' : 'Send Outreach'}
                   </button>
+                  {copiedId===m.influencerId && (
+                    <div className="p-3 rounded-lg" style={{background:'rgba(74,222,128,0.08)', border:'1px solid rgba(74,222,128,0.2)'}}>
+                      <p className="text-xs mb-1" style={{color:'#4ade80'}}>✓ Custom DM copied to your clipboard. Paste it into Instagram.</p>
+                      {m.email && (
+                        <div className="mt-2 pt-2" style={{borderTop:'1px solid rgba(74,222,128,0.15)'}}>
+                          <p className="text-xs mb-1" style={{color:'#555'}}>Or reach out via email:</p>
+                          <p className="text-xs font-mono" style={{color:'#60a5fa'}}>{m.email}</p>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
             ))}
