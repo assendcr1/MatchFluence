@@ -162,5 +162,58 @@ namespace BackendAPI.Controllers
             await _context.SaveChangesAsync();
             return NoContent();
         }
+        [HttpGet("search")]
+        public async Task<IActionResult> Search([FromQuery] string q)
+        {
+            if (string.IsNullOrWhiteSpace(q)) return Ok(new List<object>());
+
+            var results = await _context.Influencers
+                .Include(i => i.Niche)
+                .Include(i => i.Market)
+                .Where(i => !i.IsBusinessAccount &&
+                    (i.DisplayName.ToLower().Contains(q.ToLower()) ||
+                     i.Name.ToLower().Contains(q.ToLower()) ||
+                     (i.InstagramHandle != null && i.InstagramHandle.ToLower().Contains(q.ToLower()))))
+                .OrderByDescending(i => i.FollowerCount)
+                .Take(20)
+                .ToListAsync();
+
+            return Ok(results);
+        }
+
+        [HttpGet("{id:guid}/ai-summary")]
+        public async Task<IActionResult> GetAiSummary(Guid id)
+        {
+            var influencer = await _context.Influencers
+                .Include(i => i.Niche)
+                .Include(i => i.Market)
+                .FirstOrDefaultAsync(i => i.Id == id);
+
+            if (influencer == null) return NotFound();
+
+            var gemini = HttpContext.RequestServices.GetService<BackendAPI.Services.GeminiReasoningService>();
+            if (gemini == null) return Ok(new { summary = "AI summary unavailable." });
+
+            var summary = await gemini.GenerateInfluencerSummaryAsync(
+                influencer.DisplayName,
+                influencer.FollowerCount,
+                influencer.EngagementRate,
+                influencer.BotScore,
+                influencer.MediaCount ?? 0,
+                influencer.Niche?.NicheName ?? "General",
+                influencer.Market?.MarketName ?? "Africa"
+            );
+
+            return Ok(new {
+                handle = influencer.InstagramHandle,
+                displayName = influencer.DisplayName,
+                followers = influencer.FollowerCount,
+                engagementRate = influencer.EngagementRate,
+                botScore = influencer.BotScore,
+                niche = influencer.Niche?.NicheName,
+                market = influencer.Market?.MarketName,
+                summary
+            });
+        }
     }
 }

@@ -24,6 +24,9 @@ export const api = {
   getInfluencerMetrics: (id) => axios.get(`${BASE}/influencer/${id}/metrics`),
   getInfluencerCampaigns: (id) => axios.get(`${BASE}/influencer/${id}/campaigns`),
   getInfluencerSummary: (id) => axios.get(`${BASE}/influencer/${id}/summary`),
+  getInfluencerAiSummary: (id) => axios.get(`${BASE}/influencer/${id}/ai-summary`),
+  searchInfluencers: (query) => axios.get(`${BASE}/influencer/search?q=${encodeURIComponent(query)}`),
+  saveCampaign: (token, d) => axios.post(`${BASE}/campaigns`, d, bearer(token)),
 
   // Instagram OAuth
   getInstagramAuthUrl: (influencerId) =>

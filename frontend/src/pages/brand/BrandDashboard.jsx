@@ -2,14 +2,16 @@ import { useEffect } from 'react'
 import { Routes, Route, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
 import Sidebar from '../../components/Sidebar'
-import { LayoutDashboard, PlusCircle, Megaphone, Send, Settings } from 'lucide-react'
+import { LayoutDashboard, PlusCircle, Megaphone, Send, Settings, Search } from 'lucide-react'
 import BrandHome from './BrandHome'
 import BrandNewCampaign from './BrandNewCampaign'
 import BrandCampaigns from './BrandCampaigns'
 import BrandSettings from './BrandSettings'
+import BrandInfluencerSearch from './BrandInfluencerSearch'
 const links = [
   {to:'/brand',icon:LayoutDashboard,label:'Home'},
   {to:'/brand/new-campaign',icon:PlusCircle,label:'New Campaign'},
+  {to:'/brand/search',icon:Search,label:'Find Influencers'},
   {to:'/brand/campaigns',icon:Megaphone,label:'My Campaigns'},
   {to:'/brand/settings',icon:Settings,label:'Settings'},
 ]
@@ -26,6 +28,7 @@ export default function BrandDashboard() {
           <Route path="new-campaign" element={<BrandNewCampaign />} />
           <Route path="campaigns" element={<BrandCampaigns />} />
           <Route path="settings" element={<BrandSettings />} />
+          <Route path="search" element={<BrandInfluencerSearch />} />
         </Routes>
       </main>
     </div>
