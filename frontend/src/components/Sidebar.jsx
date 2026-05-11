@@ -13,7 +13,7 @@ export default function Sidebar({ links, accentColor = 'teal' }) {
       {/* Logo */}
       <div className="px-4 py-5 border-b border-ink-700">
         <div className="mb-3">
-          <img src="/logo.png" alt="MatFluenca" style={{ height: '28px', maxWidth: '140px', objectFit: 'contain' }} />
+          <img src="/logo.png" alt="MatFluenca" style={{ height: '44px', maxWidth: '160px', objectFit: 'contain' }} />
         </div>
         {session && (
           <div>

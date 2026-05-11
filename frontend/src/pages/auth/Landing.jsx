@@ -140,7 +140,7 @@ export default function Landing() {
           padding: '16px 40px'
         }}>
           <div className="max-w-7xl mx-auto flex items-center justify-between">
-            <img src="/logo.png" alt="MatFluenca" style={{ height: '32px' }} />
+            <img src="/logo.png" alt="MatFluenca" style={{ height: '48px' }} />
             <div className="flex items-center gap-3">
               <button onClick={() => navigate('/influencer/login')} className="text-sm px-4 py-2 rounded-lg transition-colors hover:text-white" style={{ color: '#666' }}>Influencer Login</button>
               <button onClick={() => navigate('/agency/login')} className="text-sm px-4 py-2 rounded-lg transition-colors hover:text-white" style={{ color: '#666' }}>Agency Login</button>
@@ -355,7 +355,7 @@ export default function Landing() {
         <footer className="px-10 py-10" style={{ borderTop: '1px solid #111' }}>
           <div className="max-w-7xl mx-auto">
             <div className="flex items-center justify-between mb-8">
-              <img src="/logo.png" alt="MatFluenca" style={{ height: '28px', objectFit: 'contain' }} />
+              <img src="/logo.png" alt="MatFluenca" style={{ height: '40px', objectFit: 'contain' }} />
               <div className="flex items-center gap-8">
                 <button onClick={() => navigate('/privacy')} className="text-sm text-white transition-colors hover:text-white/60">Privacy Policy</button>
                 <button onClick={() => navigate('/terms')} className="text-sm text-white transition-colors hover:text-white/60">Terms of Service</button>

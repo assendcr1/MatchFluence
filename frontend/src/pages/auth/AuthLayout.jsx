@@ -5,7 +5,7 @@ export default function AuthLayout({ title, subtitle, accent = '#2dd4bf', childr
     <div className="min-h-screen flex items-center justify-center px-4" style={{ background: '#0a0a0a' }}>
       <div className="w-full max-w-md">
         <button onClick={() => navigate('/')} className="flex items-center gap-2 mb-6 opacity-50 hover:opacity-100 transition-opacity">
-          <img src='/logo.png' alt='MatFluenca' style={{ height: '24px' }} />
+          <img src='/logo.png' alt='MatFluenca' style={{ height: '40px' }} />
         </button>
         <div className="card p-7">
           <h1 className="text-xl font-bold text-white mb-1" style={{ fontFamily: 'Syne, sans-serif' }}>{title}</h1>
