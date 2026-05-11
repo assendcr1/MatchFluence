@@ -26,7 +26,6 @@ export const api = {
   getInfluencerSummary: (id) => axios.get(`${BASE}/influencer/${id}/summary`),
   getInfluencerAiSummary: (id) => axios.get(`${BASE}/influencer/${id}/ai-summary`),
   searchInfluencers: (query) => axios.get(`${BASE}/influencer/find?q=${encodeURIComponent(query)}`),
-  saveCampaign: (token, d) => axios.post(`${BASE}/campaigns`, d, bearer(token)),
 
   // Instagram OAuth
   getInstagramAuthUrl: (influencerId) =>
@@ -66,7 +65,7 @@ export const api = {
   influencerRegister: (d) => axios.post(`${BASE}/auth/influencer/register`, d),
 
   runMatch: (token, d) => axios.post(`${BASE}/match`, d, bearer(token)),
-  saveCampaign: (key, d) => axios.post(`${BASE}/campaigns`, d, bearer(key)),
+  saveCampaign: (token, d) => axios.post(`${BASE}/campaign`, d, bearer(token)),
 
   // Messaging
   sendMessage: (d) => axios.post(`${BASE}/messaging/send-message`, d),

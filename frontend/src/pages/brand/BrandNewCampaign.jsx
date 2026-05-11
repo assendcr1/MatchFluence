@@ -49,8 +49,17 @@ export default function BrandNewCampaign() {
     setSaving(true)
     try {
       await api.saveCampaign(session.token, {
-        ...form,
-        matchedInfluencerIds: results.matches?.map(m => m.influencerId) || []
+        title: form.campaignTitle,
+        description: form.campaignDescription,
+        targetPlatform: form.targetPlatform,
+        audienceAgeMin: form.audienceAgeMin || 0,
+        audienceAgeMax: form.audienceAgeMax || 0,
+        audienceGender: form.audienceGender || 'Any',
+        contentType: form.contentType || '',
+        minimumFollowers: form.minimumFollowers || 0,
+        maximumFollowers: form.maximumFollowers || 0,
+        startDate: new Date().toISOString(),
+        endDate: new Date(Date.now() + 30*24*60*60*1000).toISOString()
       })
       setSaved(true)
     }
