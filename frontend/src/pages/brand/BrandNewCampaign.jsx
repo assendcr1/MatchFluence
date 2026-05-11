@@ -52,7 +52,7 @@ export default function BrandNewCampaign() {
       const today = new Date()
       const endDate = new Date(Date.now() + 30*24*60*60*1000)
       const fmt = (d) => d.toISOString().split('T')[0]
-      await api.saveCampaign(session.token, {
+      const saveRes = await api.saveCampaign(session.token, {
         title: `${form.campaignTitle} — ${Date.now()}` ,
         _favourites: [...favourites],
         description: form.campaignDescription,
@@ -71,11 +71,12 @@ export default function BrandNewCampaign() {
         createdByAgencyId: session.userType === 'Agency' ? session.id : null
       })
       setSaved(true)
-      // Store favourites against campaign title for BrandCampaigns to read
+      // Store favourites against campaign ID for BrandCampaigns to read
       if (favourites.size > 0) {
         try {
           const existing = JSON.parse(localStorage.getItem('mf_favourites') || '{}')
-          existing[form.campaignTitle] = [...favourites]
+          const campaignId = saveRes?.data?.id || saveRes?.id || form.campaignTitle
+          existing[campaignId] = [...favourites]
           localStorage.setItem('mf_favourites', JSON.stringify(existing))
         } catch {}
       }
