@@ -197,7 +197,7 @@ namespace BackendAPI.Services.Discovery
                 // Gate 1: Permanent in-memory blocklist — zero API calls
                 if (PermanentBlocklist.Contains(clean))
                 {
-                    _logger.LogDebug("Blocked (memory) @{Handle}", clean);
+                    _logger.LogInformation("Blocked (memory) @{Handle}", clean);
                     return null;
                 }
 
@@ -208,7 +208,7 @@ namespace BackendAPI.Services.Discovery
                     .AnyAsync(b => b.InstagramHandle.ToLower() == clean, ct);
                 if (isBlocked)
                 {
-                    _logger.LogDebug("Blocked (DB) @{Handle}", clean);
+                    _logger.LogInformation("Blocked (DB) @{Handle}", clean);
                     return null;
                 }
 
@@ -218,7 +218,7 @@ namespace BackendAPI.Services.Discovery
                                    (i.InstagramHandle != null && i.InstagramHandle.ToLower() == "@" + clean), ct);
                 if (exists)
                 {
-                    _logger.LogDebug("Already exists @{Handle}", clean);
+                    _logger.LogInformation("Already exists @{Handle}", clean);
                     return null;
                 }
 
@@ -229,21 +229,21 @@ namespace BackendAPI.Services.Discovery
                 // Gate 5: Hard follower minimum
                 if (profile.FollowersCount < 1000)
                 {
-                    _logger.LogDebug("Too few followers @{Handle} ({Count})", clean, profile.FollowersCount);
+                    _logger.LogInformation("Too few followers @{Handle} ({Count})", clean, profile.FollowersCount);
                     return null;
                 }
 
                 // Gate 6: Must have biography
                 if (string.IsNullOrWhiteSpace(profile.Biography) || profile.Biography.Length < 10)
                 {
-                    _logger.LogDebug("No biography @{Handle}", clean);
+                    _logger.LogInformation("No biography @{Handle}", clean);
                     return null;
                 }
 
                 // Gate 7: Must have posts
                 if (profile.MediaCount < 6)
                 {
-                    _logger.LogDebug("Too few posts @{Handle} ({Count})", clean, profile.MediaCount);
+                    _logger.LogInformation("Too few posts @{Handle} ({Count})", clean, profile.MediaCount);
                     return null;
                 }
 
@@ -276,7 +276,7 @@ namespace BackendAPI.Services.Discovery
                 };
                 if (engagementRate < minEngagement)
                 {
-                    _logger.LogDebug("Low engagement @{Handle} ({Rate}% < {Min}%)", clean, engagementRate, minEngagement);
+                    _logger.LogInformation("Low engagement @{Handle} ({Rate}% < {Min}%)", clean, engagementRate, minEngagement);
                     return null;
                 }
 
@@ -295,14 +295,14 @@ namespace BackendAPI.Services.Discovery
                     var daysSinceLastPost = (DateTime.UtcNow - newest).TotalDays;
                     if (daysSinceLastPost > 60)
                     {
-                        _logger.LogDebug("Inactive @{Handle} — last post {Days} days ago", clean, (int)daysSinceLastPost);
+                        _logger.LogInformation("Inactive @{Handle} — last post {Days} days ago", clean, (int)daysSinceLastPost);
                         return null;
                     }
                 }
 
                 if (postsPerWeek < 0.5m && media.Count < 20)
                 {
-                    _logger.LogDebug("Inconsistent posting @{Handle} ({Rate} posts/week)", clean, postsPerWeek);
+                    _logger.LogInformation("Inconsistent posting @{Handle} ({Rate} posts/week)", clean, postsPerWeek);
                     return null;
                 }
 
@@ -354,7 +354,7 @@ namespace BackendAPI.Services.Discovery
                 // Must score at least 5/10 to be ingested
                 if (score < 5)
                 {
-                    _logger.LogDebug("Low confidence @{Handle} ({Score}/10)", clean, score);
+                    _logger.LogInformation("Low confidence @{Handle} ({Score}/10)", clean, score);
                     return null;
                 }
 
