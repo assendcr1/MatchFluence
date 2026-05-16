@@ -117,38 +117,55 @@ namespace BackendAPI.Services.Discovery
             };
 
             // ── Brand detection ───────────────────────────────────────────
-            // Signal 1: category_name contains brand keyword
+            // Check safe influencer categories FIRST — bypass all brand signals
+            bool isSafeCreator = false;
             if (!string.IsNullOrEmpty(profile.CategoryName))
             {
-                foreach (var keyword in BrandCategoryKeywords)
+                foreach (var safeCategory in InfluencerSafeCategories)
                 {
-                    if (profile.CategoryName.Contains(keyword, StringComparison.OrdinalIgnoreCase))
+                    if (profile.CategoryName.Contains(safeCategory, StringComparison.OrdinalIgnoreCase))
                     {
-                        result.IsBrand = true;
-                        result.BrandReason = $"Category: {profile.CategoryName}";
-                        return result;
+                        isSafeCreator = true;
+                        break;
                     }
                 }
             }
 
-            // Signal 2: is_business_account + very low following ratio
-            if (profile.IsBusinessAccount && profile.FollowersCount > 10000
-                && profile.FollowsCount < 200)
+            if (!isSafeCreator)
             {
-                result.IsBrand = true;
-                result.BrandReason = $"Business account with low following ({profile.FollowsCount})";
-                return result;
-            }
+                // Signal 1: category_name contains brand keyword
+                if (!string.IsNullOrEmpty(profile.CategoryName))
+                {
+                    foreach (var keyword in BrandCategoryKeywords)
+                    {
+                        if (profile.CategoryName.Contains(keyword, StringComparison.OrdinalIgnoreCase))
+                        {
+                            result.IsBrand = true;
+                            result.BrandReason = $"Category: {profile.CategoryName}";
+                            return result;
+                        }
+                    }
+                }
 
-            // Signal 3: extreme follower/following ratio (>500:1) with high followers
-            // Real influencers follow at least 0.2% of their followers back
-            if (profile.FollowersCount > 100000 && profile.FollowsCount < (profile.FollowersCount * 0.002))
-            {
-                result.IsBrand = true;
-                result.BrandReason = $"Extreme ratio: {profile.FollowersCount} followers, {profile.FollowsCount} following";
-                return result;
-            }
+                // Signal 2: is_business_account + very low following
+                if (profile.IsBusinessAccount && profile.FollowersCount > 10000
+                    && profile.FollowsCount < 200)
+                {
+                    result.IsBrand = true;
+                    result.BrandReason = $"Business account with low following ({profile.FollowsCount})";
+                    return result;
+                }
 
+                // Signal 3: extreme ratio — only if no category set
+                if (string.IsNullOrEmpty(profile.CategoryName)
+                    && profile.FollowersCount > 100000
+                    && profile.FollowsCount < (profile.FollowersCount * 0.001))
+                {
+                    result.IsBrand = true;
+                    result.BrandReason = $"Extreme ratio with no category: {profile.FollowersCount} followers, {profile.FollowsCount} following";
+                    return result;
+                }
+            }
             // ── Market detection from biography ───────────────────────────
             if (!string.IsNullOrEmpty(profile.Biography))
             {
