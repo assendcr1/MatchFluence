@@ -12,6 +12,7 @@ namespace BackendAPI.Services.Discovery
         private readonly ILogger<InfluencerDiscoveryService> _logger;
 
         private static readonly TimeSpan ThrottleDelay = TimeSpan.FromSeconds(2);
+        private readonly GeminiClassificationService _geminiClassifier;
 
         // Seed SA brand accounts mapped to niche IDs
         private static readonly Dictionary<string, int> SaBrandAccountNiches = new()
@@ -118,12 +119,14 @@ namespace BackendAPI.Services.Discovery
             IInstagramService instagramService,
             BotScoreCalculator botScoreCalculator,
             InfluencerClassifier classifier,
+            GeminiClassificationService geminiClassifier,
             ILogger<InfluencerDiscoveryService> logger)
         {
             _scopeFactory = scopeFactory;
             _instagramService = instagramService;
             _botScoreCalculator = botScoreCalculator;
             _classifier = classifier;
+            _geminiClassifier = geminiClassifier;
             _logger = logger;
         }
 
@@ -355,9 +358,18 @@ namespace BackendAPI.Services.Discovery
                     return null;
                 }
 
+                // ── AI Classification — Gemini identifies who this person is ──
+                var aiClass = await _geminiClassifier.ClassifyInfluencerAsync(
+                    clean, profile.Name ?? clean, profile.Biography,
+                    profile.CategoryName, profile.FollowersCount, profile.FollowsCount);
+
+                // Use AI classification if confident, fall back to rule-based
+                var finalNicheId = aiClass.Confidence != "Low" ? aiClass.NicheId : classification.NicheId;
+                var finalMarketId = aiClass.Confidence != "Low" ? aiClass.MarketId : classification.MarketId;
+
                 _logger.LogInformation(
-                    "✓ Qualified @{Handle} — Score:{Score}/10 | Eng:{Eng}% | Posts/wk:{PPW} | Niche:{Niche} | Market:{Market}",
-                    clean, score, engagementRate, postsPerWeek, classification.NicheId, classification.MarketId);
+                    "✓ Qualified @{Handle} — Score:{Score}/10 | Eng:{Eng}% | Posts/wk:{PPW} | Niche:{Niche} | Market:{Market} | AI Confidence:{Conf}",
+                    clean, score, engagementRate, postsPerWeek, aiClass.NicheName, aiClass.MarketName, aiClass.Confidence);
 
                 return new DiscoveredAccount
                 {
@@ -368,7 +380,7 @@ namespace BackendAPI.Services.Discovery
                     EngagementRate = engagementRate,
                     PostCount = profile.MediaCount,
                     DiscoverySource = "GraphExpansion",
-                    DiscoveryContext = $"{classification.NicheId}:{classification.MarketId}"
+                    DiscoveryContext = $"{finalNicheId}:{finalMarketId}"
                 };
             }
             catch (Exception ex)

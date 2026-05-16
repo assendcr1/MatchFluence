@@ -57,6 +57,7 @@ builder.Services.AddScoped<ApiKeyService>();
 builder.Services.AddScoped<IMatchingService, MatchingService>();
 builder.Services.AddScoped<IAIReasoningService, GeminiReasoningService>();
 builder.Services.AddScoped<GeminiReasoningService>();
+builder.Services.AddScoped<BackendAPI.Services.Discovery.GeminiClassificationService>();
 builder.Services.AddSingleton<BotScoreCalculator>();
 builder.Services.AddScoped<IInfluencerRefreshService, InfluencerRefreshService>();
 builder.Services.AddScoped<IInfluencerDiscoveryService, InfluencerDiscoveryService>();
