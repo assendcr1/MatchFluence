@@ -306,19 +306,20 @@ namespace BackendAPI.Services.Discovery
                     if (daySpan > 0)
                         postsPerWeek = Math.Round((decimal)(media.Count / (daySpan / 7)), 2);
 
-                    // Must have posted in last 60 days
+                    // Must have posted in last 60 days — inactive gets Low priority instead of rejection
                     var daysSinceLastPost = (DateTime.UtcNow - newest).TotalDays;
                     if (daysSinceLastPost > 60)
                     {
-                        _logger.LogInformation("Inactive @{Handle} — last post {Days} days ago", clean, (int)daysSinceLastPost);
-                        return null;
+                        _logger.LogInformation("Inactive @{Handle} — last post {Days} days ago — adding as Low priority", clean, (int)daysSinceLastPost);
+                        // Don't return null — let them through with Low priority flag
+                        postsPerWeek = 0; // Will score 0 on consistency = low confidence score
                     }
                 }
 
                 if (postsPerWeek < 0.5m && media.Count < 20)
                 {
-                    _logger.LogInformation("Inconsistent posting @{Handle} ({Rate} posts/week)", clean, postsPerWeek);
-                    return null;
+                    _logger.LogInformation("Inconsistent posting @{Handle} ({Rate} posts/week) — will be Low priority", clean, postsPerWeek);
+                    // Don't reject — let confidence scoring decide, will score low and get Low priority
                 }
 
                 // Confidence scoring (0-10)
