@@ -367,6 +367,18 @@ namespace BackendAPI.Services.Discovery
                 var finalNicheId = aiClass.Confidence != "Low" ? aiClass.NicheId : classification.NicheId;
                 var finalMarketId = aiClass.Confidence != "Low" ? aiClass.MarketId : classification.MarketId;
 
+                // ── Reject non-African influencers with high confidence ──────────
+                // African markets: 1=SA, 2=Nigeria, 3=Kenya, 4=Ghana, 5=Egypt, 11=Zimbabwe
+                // Global (10) = unknown, keep it
+                var africanMarkets = new HashSet<int> { 1, 2, 3, 4, 5, 10, 11 };
+                if (aiClass.Confidence == "High" && !africanMarkets.Contains(finalMarketId))
+                {
+                    _logger.LogInformation(
+                        "Rejected non-African @{Handle} — {Market} (High confidence)",
+                        clean, aiClass.MarketName);
+                    return null;
+                }
+
                 _logger.LogInformation(
                     "✓ Qualified @{Handle} — Score:{Score}/10 | Eng:{Eng}% | Posts/wk:{PPW} | Niche:{Niche} | Market:{Market} | AI Confidence:{Conf}",
                     clean, score, engagementRate, postsPerWeek, aiClass.NicheName, aiClass.MarketName, aiClass.Confidence);
