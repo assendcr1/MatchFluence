@@ -21,6 +21,7 @@ namespace BackendAPI.Data
         public DbSet<CampaignInfluencer> CampaignInfluencers { get; set; }
         public DbSet<InfluencerCollaboration> InfluencerCollaborations { get; set; }
         public DbSet<MetricSnapshot> MetricSnapshots { get; set; }
+    public DbSet<DiscoveryBlocklist> DiscoveryBlocklist { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {

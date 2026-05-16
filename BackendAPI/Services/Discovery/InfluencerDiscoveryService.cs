@@ -191,6 +191,198 @@ namespace BackendAPI.Services.Discovery
             {
                 var clean = handle.TrimStart('@').ToLower();
 
+                // Gate 1: Permanent in-memory blocklist — zero API calls
+                if (PermanentBlocklist.Contains(clean))
+                {
+                    _logger.LogDebug("Blocked (memory) @{Handle}", clean);
+                    return null;
+                }
+
+                // Gate 2: DB blocklist check — zero API calls
+                using var scope = _scopeFactory.CreateScope();
+                var ctx = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+                var isBlocked = await ctx.DiscoveryBlocklist
+                    .AnyAsync(b => b.InstagramHandle.ToLower() == clean, ct);
+                if (isBlocked)
+                {
+                    _logger.LogDebug("Blocked (DB) @{Handle}", clean);
+                    return null;
+                }
+
+                // Gate 3: Already in database — skip API call
+                var exists = await ctx.Influencers
+                    .AnyAsync(i => i.DisplayName.ToLower() == clean ||
+                                   (i.InstagramHandle != null && i.InstagramHandle.ToLower() == "@" + clean), ct);
+                if (exists)
+                {
+                    _logger.LogDebug("Already exists @{Handle}", clean);
+                    return null;
+                }
+
+                // Gate 4: Fetch profile — first API call
+                var profile = await _instagramService.GetPublicProfileAsync(clean);
+                if (profile == null) return null;
+
+                // Gate 5: Hard follower minimum
+                if (profile.FollowersCount < 1000)
+                {
+                    _logger.LogDebug("Too few followers @{Handle} ({Count})", clean, profile.FollowersCount);
+                    return null;
+                }
+
+                // Gate 6: Must have biography
+                if (string.IsNullOrWhiteSpace(profile.Biography) || profile.Biography.Length < 10)
+                {
+                    _logger.LogDebug("No biography @{Handle}", clean);
+                    return null;
+                }
+
+                // Gate 7: Must have posts
+                if (profile.MediaCount < 6)
+                {
+                    _logger.LogDebug("Too few posts @{Handle} ({Count})", clean, profile.MediaCount);
+                    return null;
+                }
+
+                // Gate 8: Brand detection
+                var classification = _classifier.Classify(profile, 7, 10);
+                if (classification.IsBrand)
+                {
+                    _logger.LogInformation("Skipping brand @{Handle} — {Reason}", clean, classification.BrandReason);
+                    return null;
+                }
+
+                // Gate 9: Get media for engagement + consistency — second API call
+                var media = await _instagramService.GetMediaAsync(clean);
+                await Task.Delay(500, CancellationToken.None);
+
+                decimal engagementRate = 0;
+                if (media.Any() && profile.FollowersCount > 0)
+                {
+                    var totalEng = media.Take(12).Sum(m => m.LikeCount + m.CommentsCount);
+                    engagementRate = Math.Round(
+                        (decimal)totalEng / Math.Min(media.Count, 12) / profile.FollowersCount * 100, 2);
+                }
+
+                // Gate 10: Minimum engagement rate by tier
+                decimal minEngagement = profile.FollowersCount switch
+                {
+                    < 10_000 => 3.0m,
+                    < 100_000 => 1.5m,
+                    _ => 0.5m
+                };
+                if (engagementRate < minEngagement)
+                {
+                    _logger.LogDebug("Low engagement @{Handle} ({Rate}% < {Min}%)", clean, engagementRate, minEngagement);
+                    return null;
+                }
+
+                // Gate 11: Post consistency
+                decimal postsPerWeek = 0;
+                if (media.Count >= 2)
+                {
+                    var sorted = media.OrderByDescending(m => m.Timestamp).ToList();
+                    var newest = sorted.First().Timestamp;
+                    var oldest = sorted.Last().Timestamp;
+                    var daySpan = (newest - oldest).TotalDays;
+                    if (daySpan > 0)
+                        postsPerWeek = Math.Round((decimal)(media.Count / (daySpan / 7)), 2);
+
+                    // Must have posted in last 60 days
+                    var daysSinceLastPost = (DateTime.UtcNow - newest).TotalDays;
+                    if (daysSinceLastPost > 60)
+                    {
+                        _logger.LogDebug("Inactive @{Handle} — last post {Days} days ago", clean, (int)daysSinceLastPost);
+                        return null;
+                    }
+                }
+
+                if (postsPerWeek < 0.5m && media.Count < 20)
+                {
+                    _logger.LogDebug("Inconsistent posting @{Handle} ({Rate} posts/week)", clean, postsPerWeek);
+                    return null;
+                }
+
+                // Confidence scoring (0-10)
+                int score = 0;
+
+                // Engagement (0-3 points)
+                score += engagementRate switch
+                {
+                    >= 5 => 3,
+                    >= 2 => 2,
+                    >= 1 => 1,
+                    _ => 0
+                };
+
+                // Post consistency (0-2 points)
+                score += postsPerWeek switch
+                {
+                    >= 3 => 2,
+                    >= 1 => 1,
+                    _ => 0
+                };
+
+                // Category match (0-2 points)
+                var safeCategories = new[] { "digital creator", "content creator", "public figure",
+                    "artist", "musician", "actor", "model", "comedian", "blogger", "personal blog",
+                    "fitness trainer", "chef", "photographer", "writer", "tv personality",
+                    "radio personality", "influencer", "youtuber", "dj", "athlete" };
+                if (!string.IsNullOrEmpty(profile.CategoryName) &&
+                    safeCategories.Any(c => profile.CategoryName.ToLower().Contains(c)))
+                    score += 2;
+                else if (!string.IsNullOrEmpty(profile.CategoryName))
+                    score += 1;
+
+                // Follower authenticity (0-2 points)
+                var ratio = profile.FollowsCount > 0
+                    ? (decimal)profile.FollowersCount / profile.FollowsCount
+                    : 0;
+                score += ratio switch
+                {
+                    >= 2 => 2,
+                    >= 0.5m => 1,
+                    _ => 0
+                };
+
+                // Biography quality (0-1 point)
+                if (profile.Biography.Length > 30) score += 1;
+
+                // Must score at least 5/10 to be ingested
+                if (score < 5)
+                {
+                    _logger.LogDebug("Low confidence @{Handle} ({Score}/10)", clean, score);
+                    return null;
+                }
+
+                _logger.LogInformation(
+                    "✓ Qualified @{Handle} — Score:{Score}/10 | Eng:{Eng}% | Posts/wk:{PPW} | Niche:{Niche} | Market:{Market}",
+                    clean, score, engagementRate, postsPerWeek, classification.NicheId, classification.MarketId);
+
+                return new DiscoveredAccount
+                {
+                    Handle = clean,
+                    Name = profile.Name ?? clean,
+                    FollowerCount = profile.FollowersCount,
+                    FollowingCount = profile.FollowsCount,
+                    EngagementRate = engagementRate,
+                    PostCount = profile.MediaCount,
+                    DiscoverySource = "GraphExpansion",
+                    DiscoveryContext = $"{classification.NicheId}:{classification.MarketId}"
+                };
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Qualify failed for @{Handle}", handle);
+                return null;
+            }
+        }
+
+        {
+            try
+            {
+                var clean = handle.TrimStart('@').ToLower();
+
                 // Check permanent blocklist first — no API call needed
                 if (PermanentBlocklist.Contains(clean))
                 {
