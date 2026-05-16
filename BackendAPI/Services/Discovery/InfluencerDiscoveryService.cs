@@ -459,7 +459,9 @@ namespace BackendAPI.Services.Discovery
 
         public async Task RunDiscoveryCycleAsync(CancellationToken ct)
         {
-            _logger.LogInformation("Starting discovery cycle");
+            var maxPerRun = int.TryParse(
+                Environment.GetEnvironmentVariable("DiscoverySettings__MaxPerRun"), out var m) ? m : 166;
+            _logger.LogInformation("Starting discovery cycle — max {Max} new influencers", maxPerRun);
             int discovered = 0;
 
             // ── Step 1: Mine hardcoded SA brand accounts ──────────────────
@@ -483,6 +485,7 @@ namespace BackendAPI.Services.Discovery
                         if (qualified == null) continue;
                         var id = await IngestAccountAsync(qualified, nicheId, 1, ct);
                         if (id.HasValue) discovered++;
+                        if (discovered >= maxPerRun) { _logger.LogInformation("MaxPerRun ({Max}) reached — stopping discovery", maxPerRun); return; }
                         await Task.Delay(ThrottleDelay, CancellationToken.None);
                     }
                 }
@@ -532,6 +535,7 @@ namespace BackendAPI.Services.Discovery
                                 if (qualified == null) continue;
                                 var id = await IngestAccountAsync(qualified, influencer.NicheId, influencer.MarketId, ct);
                                 if (id.HasValue) discovered++;
+                                if (discovered >= maxPerRun) { _logger.LogInformation("MaxPerRun ({Max}) reached — stopping discovery", maxPerRun); return; }
                                 await Task.Delay(ThrottleDelay, CancellationToken.None);
                             }
                         }
@@ -544,6 +548,7 @@ namespace BackendAPI.Services.Discovery
                                 qualified.DiscoveredFromInfluencerId = influencer.Id;
                                 var id = await IngestAccountAsync(qualified, influencer.NicheId, influencer.MarketId, ct);
                                 if (id.HasValue) discovered++;
+                                if (discovered >= maxPerRun) { _logger.LogInformation("MaxPerRun ({Max}) reached — stopping discovery", maxPerRun); return; }
                             }
                         }
                         await Task.Delay(ThrottleDelay, CancellationToken.None);
