@@ -378,67 +378,6 @@ namespace BackendAPI.Services.Discovery
             }
         }
 
-        {
-            try
-            {
-                var clean = handle.TrimStart('@').ToLower();
-
-                // Check permanent blocklist first — no API call needed
-                if (PermanentBlocklist.Contains(clean))
-                {
-                    _logger.LogDebug("Blocked @{Handle}", clean);
-                    return null;
-                }
-
-                var profile = await _instagramService.GetPublicProfileAsync(clean);
-                if (profile == null) return null;
-
-                // Run classification — detects brand, niche, market
-                var classification = _classifier.Classify(profile, 7, 10); // Default: Lifestyle niche, Global market
-
-                if (classification.IsBrand)
-                {
-                    _logger.LogInformation("Skipping brand @{Handle} — {Reason}",
-                        clean, classification.BrandReason);
-                    return null;
-                }
-
-                if (profile.FollowersCount < InfluencerThresholds.MinFollowers)
-                    return null;
-
-                var media = await _instagramService.GetMediaAsync(clean);
-                await Task.Delay(500, CancellationToken.None);
-
-                decimal engagementRate = 0;
-                if (media.Any() && profile.FollowersCount > 0)
-                {
-                    var totalEng = media.Take(10).Sum(m => m.LikeCount + m.CommentsCount);
-                    engagementRate = Math.Round(
-                        (decimal)totalEng / Math.Min(media.Count, 10) / profile.FollowersCount * 100, 2);
-                }
-
-                _logger.LogInformation(
-                    "Qualified @{Handle} — Niche:{Niche} Market:{Market} Confidence:{Conf}",
-                    clean, classification.NicheId, classification.MarketId, classification.Confidence);
-
-                return new DiscoveredAccount
-                {
-                    Handle = clean,
-                    Name = profile.Name ?? clean,
-                    FollowerCount = profile.FollowersCount,
-                    FollowingCount = profile.FollowsCount,
-                    EngagementRate = engagementRate,
-                    PostCount = profile.MediaCount,
-                    DiscoverySource = "GraphExpansion",
-                    DiscoveryContext = $"{classification.NicheId}:{classification.MarketId}"
-                };
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Qualify failed for @{Handle}", handle);
-                return null;
-            }
-        }
 
         public async Task<Guid?> IngestAccountAsync(
             DiscoveredAccount account, int nicheId, int marketId, CancellationToken ct)
