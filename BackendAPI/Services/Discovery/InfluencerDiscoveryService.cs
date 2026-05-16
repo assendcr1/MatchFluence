@@ -14,15 +14,30 @@ namespace BackendAPI.Services.Discovery
         private static readonly TimeSpan ThrottleDelay = TimeSpan.FromSeconds(2);
         private readonly GeminiClassificationService _geminiClassifier;
 
-        // Seed SA brand accounts mapped to niche IDs
+        // Seed SA influencer accounts mapped to niche IDs
+        // Using known SA influencers as seeds — they get tagged by other SA creators
         private static readonly Dictionary<string, int> SaBrandAccountNiches = new()
         {
-            { "woolworths_sa", 2 }, { "nandossa", 3 }, { "checkers_sa", 3 },
-            { "disneyplussouthafrica", 7 }, { "puma_za", 1 }, { "nikesouthafrica", 1 },
-            { "showmax", 7 }, { "discoverysa", 9 }, { "standardbankza", 9 },
-            { "fnbsouthafrica", 9 }, { "mtnza", 5 }, { "vodacomsa", 5 },
-            { "multichoiceza", 7 }, { "superbalistsa", 2 }, { "mrpricesa", 2 },
-            { "cottonon_za", 2 }, { "discoverysport", 1 }, { "absasouthafrica", 9 },
+            // SA Lifestyle
+            { "lasizwe", 7 }, { "sphokuhlen", 7 }, { "thecitymakoti", 7 },
+            { "theblackwendy", 7 }, { "loyisobala", 7 }, { "siyabunny", 7 },
+            // SA Fashion
+            { "kefilwe_mabote", 2 }, { "dimamthini", 2 }, { "lungilethabethe", 2 },
+            // SA Beauty
+            { "mihlalin", 4 }, { "vanessaablant", 4 }, { "nikitamakesitup", 4 },
+            // SA Entertainment
+            { "bontle.modiselle", 13 }, { "nasty_csa", 13 }, { "focalistic", 13 },
+            { "mbaureloaded", 13 }, { "djmahoota", 13 },
+            // SA Fitness
+            { "phindilegwala", 1 }, { "lavanyawiles", 1 }, { "sbunkosi", 1 },
+            // SA Food
+            { "munchin_mash", 3 }, { "zola_nene", 3 }, { "sinoyolosifo", 3 },
+            // SA Comedy
+            { "pdjokes", 11 }, { "vetkuk", 11 },
+            // Nigeria
+            { "tokemakinwa", 7 }, { "dimmaumeh", 4 }, { "kingofbingo", 11 },
+            // Kenya
+            { "azziad_nasenya", 13 }, { "ericomondi", 11 },
         };
 
         // Permanent blocklist — handles that should NEVER be ingested
